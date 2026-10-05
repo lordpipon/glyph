@@ -5,12 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ACCOUNT_PITCH,
-  cloudReady,
-  loadSession,
+  loadAccount,
   signInWithOAuth,
   signInWithPassword,
-  signInLocally,
   signUpWithPassword,
+  type AuthResult,
 } from "@/lib/auth";
 
 /**
@@ -23,26 +22,28 @@ export default function AuthPanel({ mode }: { mode: "signin" | "register" }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [localEmail, setLocalEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   // Already signed in — the app has the account menu, which is where sign out
   // lives, so there is nothing to do on this page.
   useEffect(() => {
-    if (loadSession()) router.replace("/");
+    if (loadAccount()) router.replace("/");
   }, [router]);
 
-  const run = async (task: Promise<{ ok: boolean; message: string }>) => {
+  const run = async (task: Promise<AuthResult>) => {
     setBusy(true);
     setError(null);
+    setNotice(null);
     const result = await task;
     setBusy(false);
     if (!result.ok) {
       setError(result.message);
       return;
     }
-    router.push("/");
+    if (result.home === false) setNotice(result.message);
+    else router.push("/");
   };
 
   return (
@@ -137,46 +138,12 @@ export default function AuthPanel({ mode }: { mode: "signin" | "register" }) {
           )}
 
           {error && <p className="auth-error">{error}</p>}
+          {notice && <p className="auth-notice">{notice}</p>}
 
           <button className="primary-btn auth-submit" type="submit" disabled={busy}>
             {busy ? "Working…" : register ? "Create account" : "Sign in"}
           </button>
         </form>
-
-        {!cloudReady && (
-          <>
-            <div className="auth-or" aria-hidden>
-              <span>or</span>
-            </div>
-            {/* Cloud sync is not connected yet. This keeps the account session
-                real — and the sign-out button reachable — without implying the
-                notes moved anywhere. */}
-            <label className="auth-label">
-              <span>Email for this browser</span>
-              <input
-                className="field"
-                type="email"
-                value={localEmail}
-                autoComplete="email"
-                placeholder="you@example.com"
-                spellCheck={false}
-                onChange={(e) => setLocalEmail(e.target.value)}
-              />
-            </label>
-            <button
-              type="button"
-              className="ghost-btn auth-local"
-              disabled={busy}
-              onClick={() => void run(signInLocally(localEmail))}
-            >
-              Continue with a local account
-            </button>
-            <p className="auth-hint">
-              No cloud yet, so this only labels the notes already in this
-              browser. Nothing is uploaded.
-            </p>
-          </>
-        )}
 
         <p className="auth-alt">
           {register ? (

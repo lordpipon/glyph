@@ -28,14 +28,19 @@ back.
 
 ## Accounts
 
-`/signin` and `/register` are there, and the top bar grows an account menu with
-a sign-out button once something is signed in. The cloud half is not connected
-yet: `src/lib/auth.ts` validates the form and then says so, with the matching
-`supabase.auth.*` call sitting commented out next to it. Copy `.env.example` to
+`/signin` and `/register` share one form, and the top bar grows an account menu
+with a sign-out button once someone is signed in. Copy `.env.example` to
 `.env.local` and fill in `NEXT_PUBLIC_SUPABASE_URL` and
-`NEXT_PUBLIC_SUPABASE_ANON_KEY` to switch that on. Until then the sign-in page
-offers a clearly labelled local account, which keeps the session real (and the
-sign-out button reachable) without pretending the notes moved anywhere.
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`; without them the app still runs and the account
+pages say the cloud is not connected.
+
+Google and GitHub sign in from a popup. Supabase is the OAuth broker, so going
+straight there would drag `supabase.co/auth/v1/authorize` across the address bar
+twice — the popup hides that hop and lands on `/auth/callback`, whose only job
+is to hand the session over and close itself.
+
+Storing notes in the cloud is not wired yet: signing in changes nothing about
+where your notes live, and the copy on the account pages says so.
 
 ## Phones, tablets, desktops
 
@@ -63,6 +68,7 @@ page, so `npm run build` is all it takes.
 ```
 src/app/page.tsx            mounts the client-only editor
 src/app/signin/page.tsx     account pages (with /register), one shared form
+src/app/auth/callback/      where the OAuth popup lands, closes itself
 src/app/share/[slug]/page.tsx   read-only page behind a share link
 src/components/             editor, sidebar, dialogs, menus, account menu
 src/lib/                    storage, markdown, types, share encoding, auth

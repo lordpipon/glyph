@@ -1,19 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { signOut, type Session } from "@/lib/auth";
+import { signOut, type Account } from "@/lib/auth";
 
 /**
  * The signed-in end of the top bar: an avatar that opens the account menu.
  *
- * Nothing here is a page of its own — the session lives in local storage, so
- * showing who is signed in and offering the way out is all this needs to do.
+ * Nothing here is a page of its own — the session lives in Supabase, so showing
+ * who is signed in and offering the way out is all this needs to do.
  */
 export default function AccountMenu({
-  session,
+  account,
   onSignedOut,
 }: {
-  session: Session;
+  account: Account;
   onSignedOut: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -35,13 +35,13 @@ export default function AccountMenu({
     };
   }, [open]);
 
-  const label = session.email.slice(0, 1).toUpperCase() || "?";
+  const label = account.email.slice(0, 1).toUpperCase() || "?";
 
   return (
     <div className="account" ref={wrap}>
       <button
         className="avatar"
-        title={session.email}
+        title={account.email}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
@@ -51,11 +51,11 @@ export default function AccountMenu({
 
       {open && (
         <div className="account-pop" role="menu">
-          <p className="account-email">{session.email}</p>
+          <p className="account-email">{account.email}</p>
           <p className="account-kind">
-            {session.cloud
-              ? "Synced to your account"
-              : "Local account — notes stay in this browser"}
+            {account.cloud
+              ? "Signed in with Supabase"
+              : "Signed in on this browser only"}
           </p>
           <button
             className="account-signout"

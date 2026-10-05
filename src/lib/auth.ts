@@ -1,39 +1,34 @@
 /**
  * The account layer.
  *
- * Supabase is not connected yet, so every call here validates its input and
- * then reports that the cloud half is still missing. Nothing pretends to work:
- * put the two keys below in `.env.local` and replace each body with the matching
- * `supabase.auth.*` call, and the forms in `components/AuthPanel.tsx` start
- * talking to a real project without touching the UI.
+ * Everything here talks to Supabase through the client in `supabase.ts`, and
+ * degrades to an honest "not connected" when the two keys are missing, so a
+ * clone without a `.env.local` still runs.
  *
- * What an account is for: the vault in this browser is local only, so it dies
- * with the browser data. Signing in stores the same notes in the cloud, which
- * is what makes them follow you to another machine and survive a wipe.
+ * Two details worth knowing:
  *
- * Until then there is still a session to design against, so it lives in
- * `localStorage` and `cloud: false`. Everything that reads it (the topbar chip,
- * the sign-out button) treats a local session exactly like a real one — that is
- * the whole point of keeping the shape stable — and the one thing it does not
- * do is move notes anywhere. `signInLocally` is the seam to delete.
+ * - `glyph.session.v1` is only a mirror. Supabase keeps the real session, but
+ *   reading it is asynchronous; the mirror lets the top bar paint the signed-in
+ *   state on the first frame and `watchSession` corrects it a tick later.
+ * - Google and GitHub sign in from a popup. Supabase is the OAuth broker, so
+ *   going straight there would drag `supabase.co/auth/v1/authorize` across the
+ *   address bar twice. The popup hides that hop and hands the session back
+ *   through local storage.
  */
+
+import { cloudReady, supabase } from "./supabase";
+import type { Session as SupabaseSession } from "@supabase/supabase-js";
 
 export type AuthProvider = "google" | "github";
 
-export type AuthResult = { ok: true; message: string } | { ok: false; message: string };
+export type AuthResult =
+  | { ok: true; message: string; /** false keeps the reader on this page */ home?: boolean }
+  | { ok: false; message: string };
 
-/**
- * Who is signed in. `cloud` says whether the notes behind this account live on
- * a Supabase server or in this browser, which the UI shows honestly rather than
- * implying sync that is not happening.
- */
-export type Session = { email: string; cloud: boolean; since: number };
+export type Account = { email: string; cloud: boolean; since: number };
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
-
-/** True once both keys are present, i.e. once a real Supabase project is wired. */
-export const cloudReady = SUPABASE_URL !== "" && SUPABASE_ANON_KEY !== "";
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MIRROR_KEY = "glyph.session.v1";
 
 const AWAITING_CLOUD =
   "Cloud sync is not connected yet. Add NEXT_PUBLIC_SUPABASE_URL and " +
@@ -41,21 +36,24 @@ const AWAITING_CLOUD =
 
 /** The copy shown on both account pages about what signing in changes. */
 export const ACCOUNT_PITCH =
-  "Your notes currently live in this browser only — clearing site data takes them " +
-  "with it. An account keeps the same notes in the cloud, so they open on any " +
-  "browser and stay put when this one is wiped.";
+  "Your notes currently live in this browser only. An account is what lets them " +
+  "follow you to another browser and survive a wipe — the note storage in the " +
+  "cloud is the next piece, and until it is in, signing in changes nothing about " +
+  "where your notes are.";
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** Where the OAuth popup lands. It exists only to hand the session over. */
+export const CALLBACK_PATH = "/auth/callback";
 
-const SESSION_KEY = "glyph.session.v1";
+/* ------------------------------------------------------------------ *
+ * The session mirror
+ * ------------------------------------------------------------------ */
 
-/** The session, or null when nobody is signed in. */
-export function loadSession(): Session | null {
+export function loadAccount(): Account | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem(SESSION_KEY);
+    const raw = localStorage.getItem(MIRROR_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<Session>;
+    const parsed = JSON.parse(raw) as Partial<Account>;
     if (typeof parsed.email !== "string" || !EMAIL_RE.test(parsed.email)) return null;
     return {
       email: parsed.email,
@@ -67,47 +65,58 @@ export function loadSession(): Session | null {
   }
 }
 
-function storeSession(session: Session): void {
+function writeMirror(account: Account | null): void {
   try {
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    if (account) localStorage.setItem(MIRROR_KEY, JSON.stringify(account));
+    else localStorage.removeItem(MIRROR_KEY);
   } catch {
     /* ignore */
   }
+}
+
+function toAccount(session: SupabaseSession | null): Account | null {
+  const email = session?.user?.email;
+  if (!email) return null;
+  return { email, cloud: true, since: session.user.created_at ? Date.parse(session.user.created_at) : Date.now() };
 }
 
 /**
- * A browser-only account, so the session UI is real before the cloud is. It
- * changes nothing about where the notes live — delete this and its button once
- * Supabase is wired.
+ * Reports the current account and every later change — sign in, sign out, token
+ * refresh, and the same events happening in another tab. Returns a stop
+ * function.
  */
-export async function signInLocally(email: string): Promise<AuthResult> {
-  const clean = email.trim();
-  if (!EMAIL_RE.test(clean)) return { ok: false, message: "That email does not look right." };
-  storeSession({ email: clean, cloud: false, since: Date.now() });
-  return { ok: true, message: "Signed in for this browser." };
-}
-
-/** Drops the session. The vault is untouched: it was never in it. */
-export async function signOut(): Promise<AuthResult> {
-  // await client.auth.signOut();
-  try {
-    localStorage.removeItem(SESSION_KEY);
-  } catch {
-    /* ignore */
+export async function watchAccount(onChange: (account: Account | null) => void): Promise<() => void> {
+  if (!supabase) {
+    onChange(loadAccount());
+    return () => {};
   }
-  return { ok: true, message: "Signed out." };
+
+  const push = (session: SupabaseSession | null) => {
+    const account = toAccount(session);
+    writeMirror(account);
+    onChange(account);
+  };
+
+  const { data } = await supabase.auth.getSession();
+  push(data.session);
+
+  const { data: events } = supabase.auth.onAuthStateChange((_event, session) => push(session));
+  return () => events.subscription.unsubscribe();
 }
 
-export async function signInWithPassword(
-  email: string,
-  password: string,
-): Promise<AuthResult> {
+/* ------------------------------------------------------------------ *
+ * Signing in and out
+ * ------------------------------------------------------------------ */
+
+export async function signInWithPassword(email: string, password: string): Promise<AuthResult> {
   const clean = email.trim();
   if (!EMAIL_RE.test(clean)) return { ok: false, message: "That email does not look right." };
   if (!password) return { ok: false, message: "Enter your password." };
+  if (!supabase) return { ok: false, message: AWAITING_CLOUD };
 
-  // const { error } = await client.auth.signInWithPassword({ email: clean, password });
-  return { ok: false, message: AWAITING_CLOUD };
+  const { error } = await supabase.auth.signInWithPassword({ email: clean, password });
+  if (error) return { ok: false, message: error.message };
+  return { ok: true, message: "Signed in.", home: true };
 }
 
 export async function signUpWithPassword(
@@ -123,17 +132,89 @@ export async function signUpWithPassword(
   if (password !== confirm) {
     return { ok: false, message: "The two passwords do not match." };
   }
+  if (!supabase) return { ok: false, message: AWAITING_CLOUD };
 
-  // const { error } = await client.auth.signUp({ email: clean, password });
-  return { ok: false, message: AWAITING_CLOUD };
+  const { data, error } = await supabase.auth.signUp({
+    email: clean,
+    password,
+    options: { emailRedirectTo: location.origin },
+  });
+  if (error) return { ok: false, message: error.message };
+
+  // With email confirmation on, Supabase sends the link instead of a session.
+  if (!data.session) {
+    return { ok: true, home: false, message: `Almost there — open the link in ${clean} to confirm, then sign in.` };
+  }
+  return { ok: true, message: "Account created.", home: true };
 }
 
+/**
+ * Google and GitHub, in a popup.
+ *
+ * `skipBrowserRedirect` hands back the URL instead of navigating to it, so the
+ * main tab never shows the Supabase hop. The popup comes back to
+ * `/auth/callback`, writes the session where both windows can see it, and this
+ * promise resolves.
+ */
 export async function signInWithOAuth(provider: AuthProvider): Promise<AuthResult> {
-  const label = provider === "google" ? "Google" : "GitHub";
-  if (!cloudReady) {
+  const client = supabase;
+  if (!client) {
+    const label = provider === "google" ? "Google" : "GitHub";
     return { ok: false, message: `${label} sign-in is not connected yet — it needs the same two keys as the form below.` };
   }
 
-  // await client.auth.signInWithOAuth({ provider, options: { redirectTo: origin } });
-  return { ok: false, message: AWAITING_CLOUD };
+  const { data, error } = await client.auth.signInWithOAuth({
+    provider,
+    options: { skipBrowserRedirect: true, redirectTo: `${location.origin}${CALLBACK_PATH}` },
+  });
+  if (error || !data.url) return { ok: false, message: error?.message ?? "That provider did not answer." };
+
+  const popup = window.open(data.url, "glyph-oauth", "width=520,height=680,center");
+  if (!popup) {
+    return {
+      ok: false,
+      message: "The browser blocked the sign-in window. Allow popups for this site, or use the email form below.",
+    };
+  }
+
+  return new Promise<AuthResult>((resolve) => {
+    let settled = false;
+    const finish = (result: AuthResult) => {
+      if (settled) return;
+      settled = true;
+      clearInterval(watch);
+      clearTimeout(giveUp);
+      listener.subscription.unsubscribe();
+      if (!popup.closed) popup.close();
+      resolve(result);
+    };
+
+    const { data: listener } = client.auth.onAuthStateChange((_event, session) => {
+      if (session) finish({ ok: true, message: "Signed in.", home: true });
+    });
+
+    // Two ways to notice the end: the session landing in storage, or the reader
+    // closing the window. Watching both means neither way out hangs.
+    const watch = setInterval(async () => {
+      if (popup.closed) {
+        finish({ ok: false, message: "That window closed before the sign-in finished." });
+        return;
+      }
+      const { data: current } = await client.auth.getSession();
+      if (current.session) finish({ ok: true, message: "Signed in.", home: true });
+    }, 700);
+
+    const giveUp = setTimeout(
+      () => finish({ ok: false, message: "That took too long. Try again, or use the email form." }),
+      5 * 60_000,
+    );
+  });
 }
+
+export async function signOut(): Promise<AuthResult> {
+  if (supabase) await supabase.auth.signOut();
+  writeMirror(null);
+  return { ok: true, message: "Signed out." };
+}
+
+export { cloudReady };

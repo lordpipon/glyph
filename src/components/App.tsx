@@ -9,7 +9,7 @@ import SettingsDialog from "@/components/SettingsDialog";
 import ShareDialog from "@/components/ShareDialog";
 import Sidebar from "@/components/Sidebar";
 import TagsDialog from "@/components/TagsDialog";
-import { loadSession, type Session } from "@/lib/auth";
+import { loadAccount, watchAccount, type Account } from "@/lib/auth";
 import { addTag, removeTag, renameTag, tagsIn } from "@/lib/markdown";
 import { seedVault } from "@/lib/seed";
 import {
@@ -53,7 +53,9 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(false);
   const [shareId, setShareId] = useState<string | null>(null);
-  const [session, setSession] = useState<Session | null>(() => loadSession());
+  // The mirror paints the account chip on the first frame; `watchAccount` below
+  // confirms it against Supabase and follows every later change.
+  const [account, setAccount] = useState<Account | null>(() => loadAccount());
 
   const theme = prefs.theme;
 
@@ -82,6 +84,23 @@ export default function App() {
     document.documentElement.dataset.font = font;
     saveFont(font);
   }, [font]);
+
+  // Supabase is the source of truth for the account: this covers the first read,
+  // a sign-in in another tab, and the session quietly expiring.
+  useEffect(() => {
+    let stop: (() => void) | undefined;
+    let cancelled = false;
+    void watchAccount((next) => {
+      if (!cancelled) setAccount(next);
+    }).then((fn) => {
+      if (cancelled) fn();
+      else stop = fn;
+    });
+    return () => {
+      cancelled = true;
+      stop?.();
+    };
+  }, []);
 
   // "Device" tracks the operating system while it is selected.
   useEffect(() => {
@@ -372,8 +391,8 @@ export default function App() {
 
           <div className="topbar-right">
             <span className={`saved ${saved ? "is-on" : ""}`}>{saved ? "Saved" : ""}</span>
-            {session ? (
-              <AccountMenu session={session} onSignedOut={() => setSession(null)} />
+            {account ? (
+              <AccountMenu account={account} onSignedOut={() => setAccount(null)} />
             ) : (
               <Link className="chip-btn topbar-signin" href="/signin">
                 Sign in
