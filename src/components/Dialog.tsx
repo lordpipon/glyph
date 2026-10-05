@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
 /** Modal shell: centred, focus-trapped enough for a personal tool, Esc to close. */
@@ -34,7 +34,9 @@ export default function Dialog({
     <div className="scrim" onMouseDown={onClose}>
       <div
         className="dialog"
-        style={{ width }}
+        // A variable rather than `width` itself, so the stylesheet still owns the
+        // size: the small-screen rules turn every dialog into a full-width sheet.
+        style={{ "--dialog-w": `${width}px` } as CSSProperties}
         role="dialog"
         aria-modal="true"
         aria-label={title}

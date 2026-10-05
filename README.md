@@ -21,9 +21,29 @@ page. Notes live in your browser, nothing else is involved.
 
 ## Storage
 
-Everything is kept in `localStorage` under `glyph.vault.v3`, `glyph.prefs.v1`
-and `glyph.font`. There is no account and no server. The welcome note is marked
-as kept and cannot be deleted, and **Settings → Reset notes** brings it back.
+Everything is kept in `localStorage` under `glyph.vault.v3`, `glyph.prefs.v1`,
+`glyph.font` and `glyph.session.v1`. There is no server. The welcome note is
+marked as kept and cannot be deleted, and **Settings → Reset notes** brings it
+back.
+
+## Accounts
+
+`/signin` and `/register` are there, and the top bar grows an account menu with
+a sign-out button once something is signed in. The cloud half is not connected
+yet: `src/lib/auth.ts` validates the form and then says so, with the matching
+`supabase.auth.*` call sitting commented out next to it. Copy `.env.example` to
+`.env.local` and fill in `NEXT_PUBLIC_SUPABASE_URL` and
+`NEXT_PUBLIC_SUPABASE_ANON_KEY` to switch that on. Until then the sign-in page
+offers a clearly labelled local account, which keeps the session real (and the
+sign-out button reachable) without pretending the notes moved anywhere.
+
+## Phones, tablets, desktops
+
+The sidebar is a column on wide screens and a drawer with a scrim under 860px,
+and picking a note closes it on a phone. Dialogs become bottom sheets under
+640px, tables scroll sideways rather than pushing the page wide, touch targets
+grow and row actions stay visible on coarse pointers, and
+`prefers-reduced-motion` turns the animations off.
 
 ## Running it
 
@@ -42,7 +62,8 @@ page, so `npm run build` is all it takes.
 
 ```
 src/app/page.tsx            mounts the client-only editor
+src/app/signin/page.tsx     account pages (with /register), one shared form
 src/app/share/[slug]/page.tsx   read-only page behind a share link
-src/components/             editor, sidebar, dialogs, menus
-src/lib/                    storage, markdown, types, share encoding
+src/components/             editor, sidebar, dialogs, menus, account menu
+src/lib/                    storage, markdown, types, share encoding, auth
 ```

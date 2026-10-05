@@ -1,12 +1,15 @@
 ﻿"use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import AccountMenu from "@/components/AccountMenu";
 import BlockEditor from "@/components/Block";
 import QuickSwitcher from "@/components/QuickSwitcher";
 import SettingsDialog from "@/components/SettingsDialog";
 import ShareDialog from "@/components/ShareDialog";
 import Sidebar from "@/components/Sidebar";
 import TagsDialog from "@/components/TagsDialog";
+import { loadSession, type Session } from "@/lib/auth";
 import { addTag, removeTag, renameTag, tagsIn } from "@/lib/markdown";
 import { seedVault } from "@/lib/seed";
 import {
@@ -50,6 +53,7 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(false);
   const [shareId, setShareId] = useState<string | null>(null);
+  const [session, setSession] = useState<Session | null>(() => loadSession());
 
   const theme = prefs.theme;
 
@@ -242,6 +246,14 @@ export default function App() {
     setTagFilter((cur) => (tag === null ? null : cur === tag ? null : tag));
   }, []);
 
+  /** On a phone the sidebar covers the page, so opening a note closes it. */
+  const openNote = useCallback((id: string) => {
+    setActiveId(id);
+    if (window.matchMedia?.("(max-width: 860px)").matches) {
+      setPrefs((p) => ({ ...p, sidebarOpen: false }));
+    }
+  }, []);
+
   /* ---------------- tag editing ---------------- */
 
   const renameTagEverywhere = useCallback((from: string, to: string) => {
@@ -319,23 +331,31 @@ export default function App() {
   return (
     <div className="app">
       {prefs.sidebarOpen && (
-        <Sidebar
-          notes={vault.notes}
-          folders={vault.folders}
-          activeId={activeId}
-          tagFilter={tagFilter}
-          tagCounts={tagCounts}
-          onOpen={setActiveId}
-          onToggleTag={toggleTag}
-          onCreateNote={(folderId) => createNote("Untitled", folderId)}
-          onCreateFolder={createFolder}
-          onRename={renameItem}
-          onDelete={deleteItem}
-          onMove={moveNote}
-          onDownload={downloadNote}
-          onShare={setShareId}
-          onManageTags={() => setTagsOpen(true)}
-        />
+        <>
+          {/* Only visible under 860px, where the sidebar floats as a drawer. */}
+          <button
+            className="sidebar-scrim"
+            aria-label="Close sidebar"
+            onClick={() => setPrefs((p) => ({ ...p, sidebarOpen: false }))}
+          />
+          <Sidebar
+            notes={vault.notes}
+            folders={vault.folders}
+            activeId={activeId}
+            tagFilter={tagFilter}
+            tagCounts={tagCounts}
+            onOpen={openNote}
+            onToggleTag={toggleTag}
+            onCreateNote={(folderId) => createNote("Untitled", folderId)}
+            onCreateFolder={createFolder}
+            onRename={renameItem}
+            onDelete={deleteItem}
+            onMove={moveNote}
+            onDownload={downloadNote}
+            onShare={setShareId}
+            onManageTags={() => setTagsOpen(true)}
+          />
+        </>
       )}
 
       <main className="main">
@@ -352,6 +372,13 @@ export default function App() {
 
           <div className="topbar-right">
             <span className={`saved ${saved ? "is-on" : ""}`}>{saved ? "Saved" : ""}</span>
+            {session ? (
+              <AccountMenu session={session} onSignedOut={() => setSession(null)} />
+            ) : (
+              <Link className="chip-btn topbar-signin" href="/signin">
+                Sign in
+              </Link>
+            )}
             <a
               className="icon-btn"
               href={REPO}
