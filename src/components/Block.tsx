@@ -41,6 +41,8 @@ type Props = {
   onChange: (next: string) => void;
   onNavigate: (noteTitle: string) => void;
   onTagClick: (tag: string) => void;
+  /** Rendered but not editable — the welcome note uses this. */
+  readOnly?: boolean;
 };
 
 type CaretPoint = { node: Node; offset: number };
@@ -229,14 +231,16 @@ export default function BlockEditor({
   onChange,
   onNavigate,
   onTagClick,
+  readOnly = false,
 }: Props) {
   const [blocks, setBlocks] = useState<Block[]>(() => splitBlocks(content));
   // Opening a note drops the caret straight into the first block, so typing
   // works the moment a note appears — no click and no Ctrl+E detour. The note
   // identity is the `key` below (`key={activeNote.id}` in App), so the lazy
-  // initializer runs again for every note that is opened.
+  // initializer runs again for every note that is opened. Read-only notes stay
+  // rendered and never take the caret.
   const [editingId, setEditingId] = useState<string | null>(
-    () => splitBlocks(content)[0]?.id ?? null,
+    () => (readOnly ? null : splitBlocks(content)[0]?.id ?? null),
   );
 
   // Mirrors of state that the keyboard handlers need synchronously. They are
@@ -305,17 +309,25 @@ export default function BlockEditor({
     });
   });
 
-  const activate = useCallback((block: Block, sourceOffset: number) => {
-    setEditingId(block.id);
-    focusRequest.current = { id: block.id, offset: editOffsetOf(block) + sourceOffset };
-  }, []);
+  const activate = useCallback(
+    (block: Block, sourceOffset: number) => {
+      if (readOnly) return;
+      setEditingId(block.id);
+      focusRequest.current = { id: block.id, offset: editOffsetOf(block) + sourceOffset };
+    },
+    [readOnly],
+  );
 
   const deactivate = useCallback(() => setEditingId(null), []);
 
-  const focusBlock = useCallback((id: string, offset: number) => {
-    setEditingId(id);
-    focusRequest.current = { id, offset };
-  }, []);
+  const focusBlock = useCallback(
+    (id: string, offset: number) => {
+      if (readOnly) return;
+      setEditingId(id);
+      focusRequest.current = { id, offset };
+    },
+    [readOnly],
+  );
 
   const onInput = useCallback(
     (block: Block, value: string) => {

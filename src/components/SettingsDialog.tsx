@@ -1,10 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, ChevronDown, Download, KeyRound, Link as LinkIcon, LogOut, Mail, Palette, Trash2, Type, Unlink, User } from "lucide-react";
+import { Check, Download, KeyRound, Link as LinkIcon, LogOut, Mail, Palette, Trash2, Type, Unlink, User } from "lucide-react";
 import Dialog from "@/components/Dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { FONTS, THEMES } from "@/lib/types";
 import type { FontId, Theme } from "@/lib/types";
 import {
@@ -106,21 +113,19 @@ export default function SettingsDialog({
         <>
           <AppearanceSection font={font} theme={theme} onFont={onFont} onTheme={onTheme} />
           <footer className="dialog-actions">
-            <div className="dialog-actions-left">
-              <Button
-                variant="ghost"
-                disabled={isDefault(font, theme)}
-                onClick={() => {
-                  onFont("inter");
-                  onTheme("system");
-                }}
-              >
-                Reset appearance
-              </Button>
-              <Button variant="ghost" className="text-destructive" onClick={() => setConfirming("reset")}>
-                Reset notes
-              </Button>
-            </div>
+            <Button
+              variant="ghost"
+              disabled={isDefault(font, theme)}
+              onClick={() => {
+                onFont("inter");
+                onTheme("system");
+              }}
+            >
+              Reset appearance
+            </Button>
+            <Button variant="ghost" className="text-destructive" onClick={() => setConfirming("reset")}>
+              Reset notes
+            </Button>
             <Button onClick={onClose}>Done</Button>
           </footer>
         </>
@@ -138,21 +143,19 @@ export default function SettingsDialog({
           <hr className="settings-hr" />
           <DataSection onDownloadData={onDownloadData} />
           <footer className="dialog-actions">
-            <div className="dialog-actions-left">
-              <Button
-                variant="ghost"
-                disabled={isDefault(font, theme)}
-                onClick={() => {
-                  onFont("inter");
-                  onTheme("system");
-                }}
-              >
-                Reset appearance
-              </Button>
-              <Button variant="ghost" className="text-destructive" onClick={() => setConfirming("reset")}>
-                Reset notes
-              </Button>
-            </div>
+            <Button
+              variant="ghost"
+              disabled={isDefault(font, theme)}
+              onClick={() => {
+                onFont("inter");
+                onTheme("system");
+              }}
+            >
+              Reset appearance
+            </Button>
+            <Button variant="ghost" className="text-destructive" onClick={() => setConfirming("reset")}>
+              Reset notes
+            </Button>
             <Button onClick={onClose}>Done</Button>
           </footer>
         </>
@@ -186,22 +189,22 @@ function AppearanceSection({
             <p>The font Glyph writes and reads in.</p>
           </div>
         </header>
-        <label className="font-select">
-          <select
-            className="field select-control"
-            value={font}
+        <Select value={font} onValueChange={(v) => onFont(v as FontId)}>
+          <SelectTrigger
+            className="select-control"
             aria-label="Default font"
             style={{ fontFamily: `var(--f-${font})` }}
-            onChange={(e) => onFont(e.target.value as FontId)}
           >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
             {FONTS.map((f) => (
-              <option key={f.id} value={f.id} style={{ fontFamily: `var(--f-${f.id})` }}>
-                {f.name} — {f.note}
-              </option>
+              <SelectItem key={f.id} value={f.id} style={{ fontFamily: `var(--f-${f.id})` }}>
+                {f.name}
+              </SelectItem>
             ))}
-          </select>
-          <ChevronDown className="select-chevron" aria-hidden />
-        </label>
+          </SelectContent>
+        </Select>
       </section>
 
       <section className="settings-section">
@@ -209,7 +212,7 @@ function AppearanceSection({
           <Palette />
           <div>
             <h3>Appearance</h3>
-            <p>Device is the brushed space grey; Light and Dark flip to black and white accents.</p>
+            <p>Device now matches the dark look; Light flips to a pale ground.</p>
           </div>
         </header>
         <div className="option-grid" role="radiogroup" aria-label="Theme">
@@ -300,7 +303,7 @@ function AccountSection({
               onChange={(e) => setUsername(e.target.value)}
             />
           </label>
-          <Button type="submit" size="sm" disabled={busy || username.trim() === (account.username ?? "")}>
+          <Button type="submit" className="w-full" disabled={busy || username.trim() === (account.username ?? "")}>
             Save username
           </Button>
         </form>
@@ -346,7 +349,7 @@ function AccountSection({
               onChange={(e) => setCurPassword(e.target.value)}
             />
           </label>
-          <Button type="submit" size="sm" disabled={busy}>
+          <Button type="submit" className="w-full" disabled={busy}>
             Send confirmation for {newEmail.trim() || "new email"}
           </Button>
         </form>
@@ -397,7 +400,7 @@ function AccountSection({
               onChange={(e) => setConfirmPassword(e.target.value)}
             />
           </label>
-          <Button type="submit" size="sm" disabled={busy}>
+          <Button type="submit" className="w-full" disabled={busy}>
             Update password
           </Button>
         </form>
@@ -438,18 +441,16 @@ function AccountSection({
       {message && <p className={`settings-msg is-${message.kind}`}>{message.text}</p>}
 
       <footer className="dialog-actions">
-        <div className="dialog-actions-left">
-          <Button
-            variant="ghost"
-            onClick={async () => {
-              setBusy(true);
-              await signOut();
-              onClose();
-            }}
-          >
-            <LogOut /> Sign out
-          </Button>
-        </div>
+        <Button
+          variant="ghost"
+          onClick={async () => {
+            setBusy(true);
+            await signOut();
+            onClose();
+          }}
+        >
+          <LogOut /> Sign out
+        </Button>
         <Button variant="destructive" onClick={onRequestDelete}>
           <Trash2 /> Delete account…
         </Button>
@@ -516,11 +517,11 @@ function ProviderButton({
   onAction: (r: AuthResult) => void;
 }) {
   return linked ? (
-    <Button variant="outline" size="sm" disabled={busy} onClick={() => void unlinkProvider(provider).then(onAction)}>
+    <Button variant="outline" className="w-full" disabled={busy} onClick={() => void unlinkProvider(provider).then(onAction)}>
       <Unlink /> Unlink
     </Button>
   ) : (
-    <Button variant="outline" size="sm" disabled={busy} onClick={() => void linkProvider(provider).then(onAction)}>
+    <Button variant="outline" className="w-full" disabled={busy} onClick={() => void linkProvider(provider).then(onAction)}>
       <LinkIcon /> Link
     </Button>
   );
@@ -539,7 +540,7 @@ function DataSection({ onDownloadData }: { onDownloadData: () => void }) {
           </p>
         </div>
       </header>
-      <Button onClick={onDownloadData}>
+      <Button onClick={onDownloadData} className="w-full">
         <Download /> Download all data
       </Button>
     </section>
@@ -549,10 +550,10 @@ function DataSection({ onDownloadData }: { onDownloadData: () => void }) {
 /** Three colour chips so each theme is recognisable in the grid. */
 function Swatch({ theme }: { theme: Theme }) {
   const palettes: Record<Theme, [string, string, string]> = {
-    system: ["#14161a", "#2f343c", "#d4dae4"],
+    system: ["#17161c", "#2c2b35", "#f4f4f6"],
     light: ["#fbfbfd", "#e2e2ea", "#16181d"],
     dark: ["#17161c", "#2c2b35", "#f4f4f6"],
-    aluminium: ["#14161a", "#2f343c", "#d4dae4"],
+    aluminium: ["#17161c", "#2c2b35", "#f4f4f6"],
     blue: ["#0b141d", "#1f3341", "#8ec8ff"],
     red: ["#170f11", "#332326", "#ff9f8f"],
     yellow: ["#17140c", "#332d1c", "#f0c674"],

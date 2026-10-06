@@ -26,7 +26,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import Dialog, { PromptDialog } from "@/components/Dialog";
+import Dialog from "@/components/Dialog";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import type { Folder, Note } from "@/lib/types";
 
 type Props = {
@@ -38,12 +39,13 @@ type Props = {
   onOpen: (id: string) => void;
   onToggleTag: (tag: string | null) => void;
   onCreateNote: (folderId: string | null) => void;
-  onCreateFolder: (parentId: string | null, name: string) => void;
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
   onMove: (id: string, folderId: string | null) => void;
   onShare: (id: string) => void;
   onManageTags: () => void;
+  /** App owns the \"new folder\" prompt so Ctrl+Alt+T can open it too. */
+  onNewFolderRequest: (parentId: string | null) => void;
   /** Drawer only: set while it slides away, so closing is animated too. */
   exiting?: boolean;
 };
@@ -61,12 +63,12 @@ export default function Sidebar({
   onOpen,
   onToggleTag,
   onCreateNote,
-  onCreateFolder,
   onRename,
   onDelete,
   onMove,
   onShare,
   onManageTags,
+  onNewFolderRequest,
   exiting = false,
 }: Props) {
   const [query, setQuery] = useState("");
@@ -74,7 +76,11 @@ export default function Sidebar({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [menuKey, setMenuKey] = useState<MenuKey | null>(null);
   const [moveTarget, setMoveTarget] = useState<string | null>(null);
-  const [newFolderIn, setNewFolderIn] = useState<string | null | undefined>(undefined);
+  const [confirmDelete, setConfirmDelete] = useState<{
+    kind: "note" | "folder";
+    id: string;
+    name: string;
+  } | null>(null);
 
   const q = query.trim().toLowerCase();
 
@@ -128,6 +134,21 @@ export default function Sidebar({
     [tagCounts],
   );
 
+  // The whole folder tree, indented, so "Move to" can target any level.
+  const folderTree = useMemo(() => {
+    const out: { folder: Folder; depth: number }[] = [];
+    const walk = (parentId: string | null, depth: number) => {
+      for (const f of folders
+        .filter((x) => x.parentId === parentId)
+        .sort((a, b) => a.name.localeCompare(b.name))) {
+        out.push({ folder: f, depth });
+        walk(f.id, depth + 1);
+      }
+    };
+    walk(null, 0);
+    return out;
+  }, [folders]);
+
   const openMenu = (key: MenuKey) => {
     setMenuKey(key);
   };
@@ -142,7 +163,7 @@ export default function Sidebar({
           </button>
           <button
             className="icon-btn"
-            onClick={() => setNewFolderIn(null)}
+            onClick={() => onNewFolderRequest(null)}
             title="New folder"
           >
             <FolderPlusIcon />
@@ -241,7 +262,7 @@ export default function Sidebar({
                 <DropdownMenuItem onSelect={() => onCreateNote(row.folder.id)}>
                   <FilePlus2 /> New note inside
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setNewFolderIn(row.folder.id)}>
+                <DropdownMenuItem onSelect={() => onNewFolderRequest(row.folder.id)}>
                   <FolderPlus /> New subfolder
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -250,7 +271,7 @@ export default function Sidebar({
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
-                  onSelect={() => onDelete(row.folder.id)}
+                  onSelect={() => setConfirmDelete({ kind: "folder", id: row.folder.id, name: row.folder.name })}
                 >
                   <Trash2 /> Delete “{row.folder.name}”
                 </DropdownMenuItem>
@@ -281,6 +302,7 @@ export default function Sidebar({
                   {renamingId === row.note.id ? (
                     <RenameInput
                       initial={row.note.title}
+                      fallback="Untitled"
                       onCommit={(v) => onRename(row.note.id, v)}
                       onDone={() => setRenamingId(null)}
                     />
@@ -305,9 +327,11 @@ export default function Sidebar({
                 <DropdownMenuItem onSelect={() => onShare(row.note.id)}>
                   <Share2 /> Share
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setMoveTarget(row.note.id)}>
-                  <FolderInput /> Move to…
-                </DropdownMenuItem>
+                {folders.length > 0 && (
+                  <DropdownMenuItem onSelect={() => setMoveTarget(row.note.id)}>
+                    <FolderInput /> Move to…
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 {row.note.locked ? (
                   <DropdownMenuItem disabled>
@@ -316,7 +340,13 @@ export default function Sidebar({
                 ) : (
                   <DropdownMenuItem
                     className="text-destructive focus:text-destructive"
-                    onSelect={() => onDelete(row.note.id)}
+                    onSelect={() =>
+                      setConfirmDelete({
+                        kind: "note",
+                        id: row.note.id,
+                        name: row.note.title || "Untitled",
+                      })
+                    }
                   >
                     <Trash2 /> Delete
                   </DropdownMenuItem>
@@ -364,35 +394,37 @@ export default function Sidebar({
             >
               <InboxIcon /> Inbox <em>top level</em>
             </button>
-            {folders
-              .filter((f) => !f.parentId)
-              .sort((a, b) => a.name.localeCompare(b.name))
-              .map((folder) => (
-                <button
-                  key={folder.id}
-                  className="move-row"
-                  onClick={() => {
-                    onMove(moveTarget, folder.id);
-                    setMoveTarget(null);
-                  }}
-                >
-                  <FolderIcon /> {folder.name}
-                </button>
-              ))}
+            {folderTree.map(({ folder, depth }) => (
+              <button
+                key={folder.id}
+                className="move-row"
+                style={{ paddingLeft: 10 + depth * 14 }}
+                onClick={() => {
+                  onMove(moveTarget, folder.id);
+                  setMoveTarget(null);
+                }}
+              >
+                <FolderIcon /> {folder.name}
+              </button>
+            ))}
           </div>
         </Dialog>
       )}
 
-      {newFolderIn !== undefined && (
-        <PromptDialog
-          title={newFolderIn ? "New subfolder" : "New folder"}
-          label="Folder name"
-          placeholder="Reading, Journal, Work…"
-          onConfirm={(name) => {
-            onCreateFolder(newFolderIn, name);
-            setNewFolderIn(undefined);
+      {confirmDelete && (
+        <ConfirmDialog
+          title={confirmDelete.kind === "folder" ? "Delete folder" : "Delete note"}
+          note={
+            confirmDelete.kind === "folder"
+              ? `“${confirmDelete.name}” and every note and subfolder inside it will be gone for good.`
+              : `“${confirmDelete.name}” will be gone for good.`
+          }
+          confirmLabel={confirmDelete.kind === "folder" ? "Delete folder" : "Delete note"}
+          onConfirm={() => {
+            onDelete(confirmDelete.id);
+            setConfirmDelete(null);
           }}
-          onClose={() => setNewFolderIn(undefined)}
+          onClose={() => setConfirmDelete(null)}
         />
       )}
     </aside>
@@ -403,10 +435,13 @@ export default function Sidebar({
 
 function RenameInput({
   initial,
+  fallback,
   onCommit,
   onDone,
 }: {
   initial: string;
+  /** What an empty rename commits to — notes become "Untitled". */
+  fallback?: string;
   onCommit: (value: string) => void;
   onDone: () => void;
 }) {
@@ -421,7 +456,9 @@ function RenameInput({
       onChange={(e) => setValue(e.target.value)}
       onBlur={() => {
         onDone();
-        if (value.trim()) onCommit(value.trim());
+        const clean = value.trim();
+        if (clean) onCommit(clean);
+        else if (fallback != null) onCommit(fallback);
       }}
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur();

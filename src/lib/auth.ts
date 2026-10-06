@@ -445,8 +445,21 @@ export async function oauthPopup(
       resolve(result);
     };
 
-    const { data: listener } = client.auth.onAuthStateChange((_event, session) => {
-      if (session) finish({ ok: true, message: "Done.", home: mode === "signin" });
+    const { data: listener } = client.auth.onAuthStateChange(async (event, session) => {
+      // Subscribing replays the current session as INITIAL_SESSION right away.
+      // For a link that is the account we already have — not proof the popup
+      // finished. Treating it as done was slamming the window shut no sooner
+      // than it opened. Same for silent background refresh: only a real
+      // sign-in, or a link whose new identity actually shows up, counts.
+      if (event === "INITIAL_SESSION" || event === "SIGNED_OUT") return;
+      if (session) {
+        if (mode === "link") {
+          const { data: idents } = await client.auth.getUserIdentities();
+          const linked = idents?.identities?.some((i) => i.provider === provider) ?? false;
+          if (!linked) return;
+        }
+        finish({ ok: true, message: "Done.", home: mode === "signin" });
+      }
     });
 
     // Two ways to notice the end: the session landing in storage, or the reader

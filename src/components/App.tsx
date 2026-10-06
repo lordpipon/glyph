@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Menu, Settings } from "lucide-react";
-import { signOut } from "@/lib/auth";
+import { Lock, Menu, Settings, X } from "lucide-react";
 import BlockEditor from "@/components/Block";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { PromptDialog } from "@/components/Dialog";
 import QuickSwitcher from "@/components/QuickSwitcher";
 import SettingsDialog from "@/components/SettingsDialog";
 import ShareDialog from "@/components/ShareDialog";
@@ -50,10 +51,14 @@ export default function App() {
   const [renamingTitle, setRenamingTitle] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [flash, setFlash] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [tagsOpen, setTagsOpen] = useState(false);
   const [shareId, setShareId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [folderPrompt, setFolderPrompt] = useState<{ parentId: string | null } | null>(null);
+  // The Ctrl+C copy of a note; Ctrl+V turns it into a new note.
+  const copiedRef = useRef<{ title: string; content: string } | null>(null);
   // The mirror paints the account chip on the first frame; `watchAccount` below
   // confirms it against Supabase and follows every later change.
   const [account, setAccount] = useState<Account | null>(() => loadAccount());
@@ -68,16 +73,16 @@ export default function App() {
   useEffect(() => {
     const id = setTimeout(() => {
       saveVault(vault);
-      setSaved(true);
+      setFlash("Saved");
     }, 300);
     return () => clearTimeout(id);
   }, [vault]);
 
   useEffect(() => {
-    if (!saved) return;
-    const id = setTimeout(() => setSaved(false), 1600);
+    if (!flash) return;
+    const id = setTimeout(() => setFlash(null), 1600);
     return () => clearTimeout(id);
-  }, [saved]);
+  }, [flash]);
 
   useEffect(() => {
     savePrefs({ ...prefs, lastNoteId: activeId });
@@ -143,6 +148,8 @@ export default function App() {
       ...v,
       notes: v.notes.map((n) => {
         if (n.id !== id) return n;
+        // Read-only notes (the welcome page) never change.
+        if (n.locked) return n;
         const heading = firstHeading(content);
         const adopt = n.autoTitle && heading !== null;
         return {
@@ -161,7 +168,7 @@ export default function App() {
       setVault((v) => ({
         ...v,
         notes: v.notes.map((n) => {
-          if (n.id !== id) return n;
+          if (n.id !== id || n.locked) return n;
           const content = transform(n.content);
           return content === n.content ? n : { ...n, content, updatedAt: Date.now() };
         }),
@@ -195,7 +202,9 @@ export default function App() {
     setVault((v) => ({
       ...v,
       notes: v.notes.map((n) =>
-        n.id === id ? { ...n, title: name, autoTitle: false, updatedAt: Date.now() } : n,
+        n.id === id && !n.locked
+          ? { ...n, title: name, autoTitle: false, updatedAt: Date.now() }
+          : n,
       ),
       folders: v.folders.map((f) => (f.id === id ? { ...f, name } : f)),
     }));
@@ -253,7 +262,7 @@ export default function App() {
   const moveNote = useCallback((id: string, folderId: string | null) => {
     setVault((v) => ({
       ...v,
-      notes: v.notes.map((n) => (n.id === id ? { ...n, folderId } : n)),
+      notes: v.notes.map((n) => (n.id === id && !n.locked ? { ...n, folderId } : n)),
     }));
   }, []);
 
@@ -310,13 +319,11 @@ export default function App() {
   );
 
   /** On a phone the sidebar covers the page, so opening a note closes it. */
-  const openNote = useCallback(
-    (id: string) => {
-      setActiveId(id);
-      closeSidebar();
-    },
-    [closeSidebar],
-  );
+  const openNote = useCallback((id: string) => {
+    // (No autohide: opening a note used to close the drawer, and that kept
+    // making the sidebar vanish while you worked.)
+    setActiveId(id);
+  }, []);
 
   /* ---------------- tag editing ---------------- */
 
@@ -326,6 +333,7 @@ export default function App() {
     setVault((v) => ({
       ...v,
       notes: v.notes.map((n) => {
+        if (n.locked) return n;
         const content = renameTag(n.content, from, clean);
         return content === n.content ? n : { ...n, content, updatedAt: Date.now() };
       }),
@@ -337,6 +345,7 @@ export default function App() {
     setVault((v) => ({
       ...v,
       notes: v.notes.map((n) => {
+        if (n.locked) return n;
         const content = removeTag(n.content, tag);
         return content === n.content ? n : { ...n, content, updatedAt: Date.now() };
       }),
@@ -354,19 +363,70 @@ export default function App() {
     [patchContent],
   );
 
+  /* ---------------- note clipboard ---------------- */
+
+  /** Ctrl+C with nothing selected: remember the open note (and the clipboard). */
+  const copyActiveNote = useCallback(() => {
+    if (!activeNote) return;
+    copiedRef.current = { title: activeNote.title || "Untitled", content: activeNote.content };
+    try {
+      void navigator.clipboard?.writeText(activeNote.content);
+    } catch {
+      /* the in-app copy still works without clipboard access */
+    }
+    setFlash("Copied");
+  }, [activeNote]);
+
+  /** Ctrl+V outside a field: a brand-new note from the last Ctrl+C. */
+  const pasteNote = useCallback(() => {
+    const src = copiedRef.current;
+    if (!src) return;
+    const note: Note = {
+      id: uid(),
+      title: `${src.title} copy`,
+      autoTitle: false,
+      content: src.content,
+      folderId: activeNote?.folderId ?? null,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    setVault((v) => ({ ...v, notes: [note, ...v.notes] }));
+    setActiveId(note.id);
+    setFlash("Pasted");
+  }, [activeNote?.folderId]);
+
+  /** Ctrl+X outside a field: ask before deleting the note that is open. */
+  const requestDeleteNote = useCallback(() => {
+    const note = vault.notes.find((n) => n.id === activeId);
+    if (!note || note.locked) return;
+    setConfirmDeleteId(note.id);
+  }, [vault.notes, activeId]);
+
   /* ---------------- keyboard ---------------- */
 
   useEffect(() => {
+    // Native cut/copy/paste must keep working inside the editor, so the
+    // note-level Ctrl+X/C/V shortcuts only run when focus is outside a field.
+    const inField = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      return !!el && !!el.closest("input, textarea, [contenteditable='true']");
+    };
+    const hasSelection = () => {
+      const sel = window.getSelection?.();
+      return !!sel && sel.toString().length > 0;
+    };
+
     const onKey = (e: KeyboardEvent) => {
       if (!(e.ctrlKey || e.metaKey)) return;
       const key = e.key.toLowerCase();
 
-      // Ctrl+N is the browser's "new window" and cannot be stopped from a
-      // page, so the new-note shortcut lives on Ctrl+Alt+N instead.
-      if (key === "n") {
+      // Ctrl+N is the browser's "new window" and Ctrl+T its "new tab"; neither
+      // can be stopped from a page, so both live on Ctrl+Alt+… instead.
+      if (key === "n" || key === "t") {
         if (!e.altKey) return;
         e.preventDefault();
-        createNote("Untitled");
+        if (key === "n") createNote("Untitled");
+        else setFolderPrompt({ parentId: null });
         return;
       }
 
@@ -385,13 +445,36 @@ export default function App() {
           e.preventDefault();
           setSourceMode((v) => !v);
           break;
+        case ",":
+          e.preventDefault();
+          setSettingsOpen(true);
+          break;
+        case ".":
+          e.preventDefault();
+          setTagsOpen(true);
+          break;
+        case "x":
+          if (inField(e)) return;
+          e.preventDefault();
+          requestDeleteNote();
+          break;
+        case "c":
+          if (inField(e) || hasSelection()) return;
+          e.preventDefault();
+          copyActiveNote();
+          break;
+        case "v":
+          if (inField(e)) return;
+          e.preventDefault();
+          pasteNote();
+          break;
         default:
           break;
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [createNote, toggleSidebar, vault]);
+  }, [createNote, toggleSidebar, requestDeleteNote, copyActiveNote, pasteNote]);
 
   /* ---------------- render ---------------- */
 
@@ -415,12 +498,12 @@ export default function App() {
             exiting={drawerExiting}
             onToggleTag={toggleTag}
             onCreateNote={(folderId) => createNote("Untitled", folderId)}
-            onCreateFolder={createFolder}
             onRename={renameItem}
             onDelete={deleteItem}
             onMove={moveNote}
             onShare={setShareId}
             onManageTags={() => setTagsOpen(true)}
+            onNewFolderRequest={(parentId) => setFolderPrompt({ parentId })}
           />
         </>
       )}
@@ -445,24 +528,16 @@ export default function App() {
           ) : (
             <h1
               className="crumb"
-              title={activeNote ? "Rename this note" : ""}
-              onClick={() => activeNote && setRenamingTitle(true)}
+              title={activeNote && !activeNote.locked ? "Rename this note" : undefined}
+              onClick={() => activeNote && !activeNote.locked && setRenamingTitle(true)}
             >
               {activeNote ? activeNote.title : ""}
             </h1>
           )}
 
           <div className="topbar-right">
-            <span className={`saved ${saved ? "is-on" : ""}`}>{saved ? "Saved" : ""}</span>
-            {account ? (
-              <button
-                className="chip-btn"
-                title="Sign out of your Glyph account"
-                onClick={() => void signOut().then(() => setAccount(null))}
-              >
-                Sign out
-              </button>
-            ) : (
+            <span className={`saved ${flash ? "is-on" : ""}`}>{flash ?? ""}</span>
+            {!account && (
               <Link className="chip-btn topbar-signin" href="/signin">
                 Sign in
               </Link>
@@ -488,22 +563,31 @@ export default function App() {
 
         <div className="paper">
           {activeNote ? (
-            sourceMode ? (
-              <SourceView
-                key={activeNote.id}
-                content={activeNote.content}
-                onChange={(c) => editContent(activeNote.id, c)}
-              />
-            ) : (
-              <BlockEditor
-                key={activeNote.id}
-                content={activeNote.content}
-                renderContext={renderContext}
-                onChange={(c) => editContent(activeNote.id, c)}
-                onNavigate={openNoteByTitle}
-                onTagClick={toggleTag}
-              />
-            )
+            <>
+              {activeNote.locked && (
+                <div className="note-lock">
+                  <Lock aria-hidden /> This note is read-only — it is the welcome page.
+                </div>
+              )}
+              {sourceMode ? (
+                <SourceView
+                  key={activeNote.id}
+                  content={activeNote.content}
+                  readOnly={activeNote.locked}
+                  onChange={(c) => editContent(activeNote.id, c)}
+                />
+              ) : (
+                <BlockEditor
+                  key={activeNote.id}
+                  content={activeNote.content}
+                  renderContext={renderContext}
+                  readOnly={activeNote.locked}
+                  onChange={(c) => editContent(activeNote.id, c)}
+                  onNavigate={openNoteByTitle}
+                  onTagClick={toggleTag}
+                />
+              )}
+            </>
           ) : (
             <p className="empty">No note open. Press Ctrl+Alt+N to start one.</p>
           )}
@@ -559,6 +643,32 @@ export default function App() {
           onClose={() => setShareId(null)}
         />
       )}
+
+      {confirmDeleteId && (
+        <ConfirmDialog
+          title="Delete note"
+          note={`“${vault.notes.find((n) => n.id === confirmDeleteId)?.title || "Untitled"}” will be gone for good.`}
+          confirmLabel="Delete note"
+          onConfirm={() => {
+            deleteItem(confirmDeleteId);
+            setConfirmDeleteId(null);
+          }}
+          onClose={() => setConfirmDeleteId(null)}
+        />
+      )}
+
+      {folderPrompt && (
+        <PromptDialog
+          title={folderPrompt.parentId ? "New subfolder" : "New folder"}
+          label="Folder name"
+          placeholder="Reading, Journal, Work…"
+          onConfirm={(name) => {
+            createFolder(folderPrompt.parentId, name);
+            setFolderPrompt(null);
+          }}
+          onClose={() => setFolderPrompt(null)}
+        />
+      )}
     </div>
   );
 }
@@ -568,14 +678,19 @@ export default function App() {
 function SourceView({
   content,
   onChange,
+  readOnly = false,
 }: {
   content: string;
   onChange: (next: string) => void;
+  readOnly?: boolean;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
-    ref.current?.focus();
-  }, []);
+    if (!readOnly) ref.current?.focus();
+  }, [readOnly]);
+  if (readOnly) {
+    return <pre className="source-view">{content}</pre>;
+  }
   return (
     <textarea
       ref={ref}
@@ -593,7 +708,9 @@ function firstHeading(content: string): string | null {
   return m ? m[1].trim() : null;
 }
 
-/** Inline rename for the title in the top bar — click it, type, click away. */
+/** Inline rename for the title in the top bar — click it, type, click away.
+ *  The field is sized by a hidden mirror so it hugs the text, with an X that
+ *  clears it; an empty commit falls back to "Untitled". */
 function TitleInput({
   initial,
   onCommit,
@@ -605,24 +722,40 @@ function TitleInput({
 }) {
   const [value, setValue] = useState(initial);
   return (
-    <input
-      className="crumb-input"
-      value={value}
-      autoFocus
-      onFocus={(e) => e.currentTarget.select()}
-      onChange={(e) => setValue(e.target.value)}
-      onBlur={() => {
-        onDone();
-        if (value.trim()) onCommit(value.trim());
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") e.currentTarget.blur();
-        if (e.key === "Escape") {
-          setValue(initial);
-          e.currentTarget.blur();
-        }
-      }}
-    />
+    <span className="crumb-input-wrap">
+      <span className="crumb-input-measure" aria-hidden>
+        {value.trim() || "Untitled"}
+      </span>
+      <input
+        className="crumb-input"
+        value={value}
+        autoFocus
+        onFocus={(e) => e.currentTarget.select()}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => {
+          onDone();
+          const clean = value.trim();
+          onCommit(clean || "Untitled");
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") {
+            setValue(initial);
+            e.currentTarget.blur();
+          }
+        }}
+      />
+      {value && (
+        <button
+          type="button"
+          className="crumb-clear"
+          title="Clear the title"
+          onClick={() => setValue("")}
+        >
+          <X />
+        </button>
+      )}
+    </span>
   );
 }
 

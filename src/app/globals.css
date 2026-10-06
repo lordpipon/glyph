@@ -21,26 +21,27 @@
   --measure: 42rem;
   --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
 
-  /* Device — the out-of-the-box palette: brushed space grey, no colour at all.
-     `html[data-theme="system"]` repeats it (old prefs); every themed block
-     below overrides these tokens. */
-  --bg: #14161a;
-  --bg-sunken: #0f1114;
-  --bg-panel: #1a1d22;
-  --bg-raised: #21252b;
-  --bg-hover: #2a2f36;
-  --line: #2f343c;
-  --line-soft: #23272e;
-  --text: #e6e8ea;
-  --text-dim: #a7acb4;
-  --text-faint: #737a84;
-  --accent: #d4dae4;
-  --accent-ink: #14161a;
-  --accent-soft: rgba(212, 218, 228, 0.14);
-  --link: #bcc4d1;
-  --danger: #ff8f8f;
-  --mark: rgba(212, 218, 228, 0.26);
-  --shadow: 0 18px 44px -24px rgba(0, 0, 0, 0.8);
+  /* Device — the out-of-the-box palette, which matches the Dark theme exactly
+     (a fresh install and a deliberate switch look the same). The
+     `html[data-theme="system"]` block repeats it for old prefs; every themed
+     block below overrides these tokens. */
+  --bg: #17161c;
+  --bg-sunken: #100f14;
+  --bg-panel: #1c1b22;
+  --bg-raised: #24232c;
+  --bg-hover: #2b2a34;
+  --line: #2c2b35;
+  --line-soft: #23222b;
+  --text: #e8e6ef;
+  --text-dim: #a09daf;
+  --text-faint: #6f6c7e;
+  --accent: #f4f4f6;
+  --accent-ink: #141519;
+  --accent-soft: rgba(244, 244, 246, 0.12);
+  --link: #8ab4f8;
+  --danger: #f0808c;
+  --mark: rgba(244, 244, 246, 0.22);
+  --shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.9);
 
   /* Shadcn tokens alias the palette above, so its components follow Glyph's
      themes automatically. `--accent` here is genuinely Glyph's accent; the
@@ -198,28 +199,28 @@ html[data-theme="amoled"] {
   background: var(--bg);
 }
 
-/* Aluminium — "Device" now. Brushed space grey, no colour at all. */
+/* Device — the same palette as the Dark theme now. */
 
 html[data-theme="system"],
 html[data-theme="aluminium"] {
   color-scheme: dark;
-  --bg: #14161a;
-  --bg-sunken: #0f1114;
-  --bg-panel: #1a1d22;
-  --bg-raised: #21252b;
-  --bg-hover: #2a2f36;
-  --line: #2f343c;
-  --line-soft: #23272e;
-  --text: #e6e8ea;
-  --text-dim: #a7acb4;
-  --text-faint: #737a84;
-  --accent: #d4dae4;
-  --accent-ink: #14161a;
-  --accent-soft: rgba(212, 218, 228, 0.14);
-  --link: #bcc4d1;
-  --danger: #ff8f8f;
-  --mark: rgba(212, 218, 228, 0.26);
-  --shadow: 0 18px 44px -24px rgba(0, 0, 0, 0.8);
+  --bg: #17161c;
+  --bg-sunken: #100f14;
+  --bg-panel: #1c1b22;
+  --bg-raised: #24232c;
+  --bg-hover: #2b2a34;
+  --line: #2c2b35;
+  --line-soft: #23222b;
+  --text: #e8e6ef;
+  --text-dim: #a09daf;
+  --text-faint: #6f6c7e;
+  --accent: #f4f4f6;
+  --accent-ink: #141519;
+  --accent-soft: rgba(244, 244, 246, 0.12);
+  --link: #8ab4f8;
+  --danger: #f0808c;
+  --mark: rgba(244, 244, 246, 0.22);
+  --shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.9);
   color: var(--text);
   background: var(--bg);
 }
@@ -374,6 +375,13 @@ mark {
   display: grid;
   grid-template-columns: 1fr;
   overflow: hidden;
+  animation: app-in 200ms var(--ease);
+}
+
+@keyframes app-in {
+  from {
+    opacity: 0;
+  }
 }
 
 .app:has(.sidebar) {
@@ -424,10 +432,32 @@ mark {
   background: var(--bg-hover);
 }
 
-.crumb-input {
-  flex: 1;
+/* The rename field is sized by a hidden mirror of its own text, so it hugs
+   whatever the note is called; the X clears it in one tap. */
+.crumb-input-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 1 auto;
   min-width: 0;
-  padding: 3px 8px;
+  max-width: 100%;
+}
+
+.crumb-input-measure {
+  visibility: hidden;
+  white-space: pre;
+  padding: 3px 30px 3px 10px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 550;
+}
+
+.crumb-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  min-width: 0;
+  padding: 3px 30px 3px 10px;
   border-radius: 7px;
   border: 1px solid var(--accent);
   background: var(--bg-raised);
@@ -435,6 +465,33 @@ mark {
   font: inherit;
   font-size: 14px;
   font-weight: 550;
+  color: var(--text);
+}
+
+.crumb-clear {
+  position: absolute;
+  top: 50%;
+  right: 5px;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.crumb-clear svg {
+  width: 12px;
+  height: 12px;
+}
+
+.crumb-clear:hover {
+  background: var(--bg-hover);
   color: var(--text);
 }
 
@@ -809,7 +866,8 @@ mark {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 0 5px 0 2px;
+  /* The extra left padding keeps the dots clear of the note name. */
+  padding: 0 6px 0 8px;
   opacity: 0.72;
   transition: opacity 110ms var(--ease);
 }
@@ -966,6 +1024,28 @@ mark {
   overflow-y: auto;
   padding: 64px 24px 40vh;
   scroll-behavior: smooth;
+}
+
+/* The welcome page shows a small banner instead of letting you edit it. */
+.note-lock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  max-width: var(--measure);
+  margin: 0 auto 14px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px dashed var(--line);
+  background: var(--bg-panel);
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.note-lock svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
 }
 
 .editor-body,
@@ -1403,6 +1483,14 @@ mark {
   z-index: 75;
 }
 
+/* The font Select and every dropdown-menu popup also portal out of their
+   dialog with only the layered z-50, so they need the same unlayered bump to
+   stay clickable above the content that hosts them. */
+[data-slot="select-content"],
+[data-slot="dropdown-menu-content"] {
+  z-index: 80;
+}
+
 .dialog {
   width: min(var(--dialog-w, 420px), 100%);
   max-width: 100%;
@@ -1459,10 +1547,10 @@ mark {
   line-height: 1.6;
 }
 
+/* Actions stack as one full-width button per row — the settings, account and
+   confirm dialogs all put their choices on full-width, rounded buttons. */
 .dialog-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  display: grid;
   gap: 8px;
   margin-top: 18px;
 }
@@ -1553,6 +1641,18 @@ mark {
   padding: 0 0 8px;
 }
 
+/* Sections inside the Tags dialog sit on a consistent rhythm, matching the
+   spacing the settings sections get. */
+.settings-group {
+  display: grid;
+  gap: 10px;
+  margin: 4px 0 20px;
+}
+
+.settings-group:last-child {
+  margin-bottom: 0;
+}
+
 .field {
   flex: 1;
   min-width: 0;
@@ -1592,84 +1692,14 @@ mark {
   margin-top: 10px;
 }
 
-/* a selection box, used for the default typeface */
-
-.font-select {
-  position: relative;
-  display: block;
-}
+/* the trigger of the custom font Select (Base UI, portaled) — full width so
+   it reads like the fields around it, with the built-in chevron on the end */
 
 .select-control {
   width: 100%;
-  appearance: none;
-  padding-right: 32px;
+  min-width: 0;
   cursor: pointer;
   font-size: 13px;
-}
-
-.select-chevron {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 15px;
-  height: 15px;
-  color: var(--text-dim);
-  pointer-events: none;
-}
-
-/* a list of choices: fonts */
-
-.option-list {
-  display: grid;
-  gap: 2px;
-}
-
-.option-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 10px;
-  border-radius: 8px;
-  text-align: left;
-  color: var(--text-dim);
-  transition: background 120ms var(--ease), color 120ms var(--ease);
-}
-
-.option-row:hover {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
-.option-row.is-on {
-  background: var(--accent-soft);
-}
-
-.option-preview {
-  flex: none;
-  width: 26px;
-  text-align: center;
-  font-size: 14px;
-  color: var(--text-faint);
-}
-
-.option-row.is-on .option-preview {
-  color: var(--accent);
-}
-
-.option-label {
-  font-size: 13.5px;
-  color: var(--text);
-}
-
-.option-row.is-on .option-label {
-  color: var(--accent);
-}
-
-.option-note {
-  margin-left: auto;
-  font-size: 12px;
-  color: var(--text-faint);
 }
 
 /* a grid of choices: themes */
@@ -1907,6 +1937,22 @@ mark {
   padding: 24px 0;
 }
 
+/* Every page rises softly instead of snapping in; each screen opts in below. */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.share-page {
+  animation: page-in 300ms var(--ease);
+}
+
+.share-sheet {
+  animation: page-in 300ms var(--ease) 60ms backwards;
+}
+
 .share-sheet .editor-body p,
 .share-sheet .editor-body li {
   font-family: var(--font-read);
@@ -1935,6 +1981,7 @@ mark {
   display: grid;
   place-items: center;
   padding: 40px 20px 64px;
+  animation: page-in 280ms var(--ease);
 }
 
 .auth-card {
@@ -2265,10 +2312,8 @@ mark {
 }
 
 .provider-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  display: grid;
+  gap: 6px;
   padding: 7px 2px;
 }
 
@@ -2486,7 +2531,7 @@ mark {
   }
 
   .dialog-actions {
-    flex-wrap: wrap;
+    width: 100%;
   }
 
   .dialog-actions-left {
@@ -2511,7 +2556,9 @@ mark {
   /* 16px keeps iOS from zooming in when a field takes focus */
   .field,
   .switcher > input,
-  .rename-input {
+  .rename-input,
+  .crumb-input,
+  .crumb-input-measure {
     font-size: 16px;
   }
 
