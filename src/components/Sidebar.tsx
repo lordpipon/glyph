@@ -259,19 +259,19 @@ export default function Sidebar({
                 </div>
               </div>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => onCreateNote(row.folder.id)}>
+                <DropdownMenuItem onClick={() => onCreateNote(row.folder.id)}>
                   <FilePlus2 /> New note inside
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => onNewFolderRequest(row.folder.id)}>
+                <DropdownMenuItem onClick={() => onNewFolderRequest(row.folder.id)}>
                   <FolderPlus /> New subfolder
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => setRenamingId(row.folder.id)}>
+                <DropdownMenuItem onClick={() => setRenamingId(row.folder.id)}>
                   <Pencil /> Rename
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="text-destructive focus:text-destructive"
-                  onSelect={() => setConfirmDelete({ kind: "folder", id: row.folder.id, name: row.folder.name })}
+                  onClick={() => setConfirmDelete({ kind: "folder", id: row.folder.id, name: row.folder.name })}
                 >
                   <Trash2 /> Delete “{row.folder.name}”
                 </DropdownMenuItem>
@@ -321,14 +321,14 @@ export default function Sidebar({
                 </div>
               </div>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => setRenamingId(row.note.id)}>
+                <DropdownMenuItem onClick={() => setRenamingId(row.note.id)}>
                   <Pencil /> Rename
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => onShare(row.note.id)}>
+                <DropdownMenuItem onClick={() => onShare(row.note.id)}>
                   <Share2 /> Share
                 </DropdownMenuItem>
                 {folders.length > 0 && (
-                  <DropdownMenuItem onSelect={() => setMoveTarget(row.note.id)}>
+                  <DropdownMenuItem onClick={() => setMoveTarget(row.note.id)}>
                     <FolderInput /> Move to…
                   </DropdownMenuItem>
                 )}
@@ -340,7 +340,7 @@ export default function Sidebar({
                 ) : (
                   <DropdownMenuItem
                     className="text-destructive focus:text-destructive"
-                    onSelect={() =>
+                    onClick={() =>
                       setConfirmDelete({
                         kind: "note",
                         id: row.note.id,

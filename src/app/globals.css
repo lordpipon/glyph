@@ -1483,12 +1483,33 @@ mark {
   z-index: 75;
 }
 
-/* The font Select and every dropdown-menu popup also portal out of their
-   dialog with only the layered z-50, so they need the same unlayered bump to
-   stay clickable above the content that hosts them. */
-[data-slot="select-content"],
-[data-slot="dropdown-menu-content"] {
+/* Base UI portals the Select and menu popups into <body> inside a Positioner
+   whose own cascade was the layered z-50. That cap sat beneath the unlayered
+   z-75 dialog content, so the font picker and row menus rendered behind the
+   dialog hosting them: dimmed, fuzzy and deaf to clicks. The components now
+   tag their Positioners with popup-positioner — same isolation, but an
+   unlayered z-index that actually clears the content above the backdrop. */
+.popup-positioner {
+  isolation: isolate;
   z-index: 80;
+}
+
+/* The three-dot menus read as one continuous list of text lines: entries stay
+   on one line, the panel grows to fit the widest line, and hover highlights
+   run edge to edge instead of as separate rounded chips. */
+[data-slot="dropdown-menu-content"] {
+  min-width: max-content;
+  padding: 2px;
+}
+[data-slot="dropdown-menu-item"],
+[data-slot="dropdown-menu-checkbox-item"],
+[data-slot="dropdown-menu-radio-item"] {
+  border-radius: 4px;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+[data-slot="dropdown-menu-separator"] {
+  margin-block: 2px;
 }
 
 .dialog {
