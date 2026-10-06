@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Download, KeyRound, Link as LinkIcon, LogOut, Mail, Palette, Trash2, Type, Unlink, User } from "lucide-react";
+import { Check, ChevronDown, Download, KeyRound, Link as LinkIcon, LogOut, Mail, Palette, Trash2, Type, Unlink, User } from "lucide-react";
 import Dialog from "@/components/Dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -183,26 +183,25 @@ function AppearanceSection({
           <Type />
           <div>
             <h3>Typeface</h3>
-            <p>The font Glyph writes and reads in. Every row previews its own family.</p>
+            <p>The font Glyph writes and reads in.</p>
           </div>
         </header>
-        <div className="option-list" role="radiogroup" aria-label="Default font">
-          {FONTS.map((f) => (
-            <button
-              key={f.id}
-              role="radio"
-              aria-checked={f.id === font}
-              className={`option-row ${f.id === font ? "is-on" : ""}`}
-              style={{ fontFamily: `var(--f-${f.id})` }}
-              onClick={() => onFont(f.id)}
-            >
-              <span className="option-preview">Aa</span>
-              <span className="option-label">{f.name}</span>
-              <span className="option-note">{f.note}</span>
-              {f.id === font && <Check className="option-check" />}
-            </button>
-          ))}
-        </div>
+        <label className="font-select">
+          <select
+            className="field select-control"
+            value={font}
+            aria-label="Default font"
+            style={{ fontFamily: `var(--f-${font})` }}
+            onChange={(e) => onFont(e.target.value as FontId)}
+          >
+            {FONTS.map((f) => (
+              <option key={f.id} value={f.id} style={{ fontFamily: `var(--f-${f.id})` }}>
+                {f.name} — {f.note}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="select-chevron" aria-hidden />
+        </label>
       </section>
 
       <section className="settings-section">

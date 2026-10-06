@@ -1396,6 +1396,13 @@ mark {
   backdrop-filter: blur(3px);
 }
 
+/* The popup must sit above the blurred backdrop, or the dialog renders *on*
+   the other side of it: dimmed, fuzzy and deaf to clicks. z-50 lives in a
+   Tailwind layer, so it loses here — the overlay set 70 and beat it. */
+[data-slot="dialog-content"] {
+  z-index: 75;
+}
+
 .dialog {
   width: min(var(--dialog-w, 420px), 100%);
   max-width: 100%;
@@ -1583,6 +1590,32 @@ mark {
   align-items: center;
   gap: 8px;
   margin-top: 10px;
+}
+
+/* a selection box, used for the default typeface */
+
+.font-select {
+  position: relative;
+  display: block;
+}
+
+.select-control {
+  width: 100%;
+  appearance: none;
+  padding-right: 32px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.select-chevron {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 15px;
+  height: 15px;
+  color: var(--text-dim);
+  pointer-events: none;
 }
 
 /* a list of choices: fonts */

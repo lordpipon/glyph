@@ -34,7 +34,6 @@ waiting on a decision. Rename, add or drop them with the button next to
 | \`Ctrl + Alt + N\` | New note |
 | \`Ctrl + B\` | Toggle sidebar |
 | \`Ctrl + E\` | Read the raw markdown |
-| \`Ctrl + S\` | Save now |
 
 # Making it yours
 

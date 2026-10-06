@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Menu, Settings } from "lucide-react";
-import AccountMenu from "@/components/AccountMenu";
+import { signOut } from "@/lib/auth";
 import BlockEditor from "@/components/Block";
 import QuickSwitcher from "@/components/QuickSwitcher";
 import SettingsDialog from "@/components/SettingsDialog";
@@ -385,11 +385,6 @@ export default function App() {
           e.preventDefault();
           setSourceMode((v) => !v);
           break;
-        case "s":
-          e.preventDefault();
-          saveVault(vault);
-          setSaved(true);
-          break;
         default:
           break;
       }
@@ -460,7 +455,13 @@ export default function App() {
           <div className="topbar-right">
             <span className={`saved ${saved ? "is-on" : ""}`}>{saved ? "Saved" : ""}</span>
             {account ? (
-              <AccountMenu account={account} onSignedOut={() => setAccount(null)} />
+              <button
+                className="chip-btn"
+                title="Sign out of your Glyph account"
+                onClick={() => void signOut().then(() => setAccount(null))}
+              >
+                Sign out
+              </button>
             ) : (
               <Link className="chip-btn topbar-signin" href="/signin">
                 Sign in
