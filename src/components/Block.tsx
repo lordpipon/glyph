@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type KeyboardEvent,
   type MouseEvent,
 } from "react";
@@ -135,6 +136,8 @@ type BlockViewProps = {
   onInput: (block: Block, value: string) => void;
   onNavigate: (noteTitle: string) => void;
   onTagClick: (tag: string) => void;
+  /** Position in the note, used only to stagger the entrance animation. */
+  index: number;
 };
 
 const BlockView = memo(function BlockView({
@@ -148,6 +151,7 @@ const BlockView = memo(function BlockView({
   onInput,
   onNavigate,
   onTagClick,
+  index,
 }: BlockViewProps) {
   const html = useMemo(
     () => (isEditing ? "" : renderMarkdown(block.source, context)),
@@ -182,9 +186,13 @@ const BlockView = memo(function BlockView({
     [block, onActivate, onNavigate, onTagClick],
   );
 
+  // The stagger is capped in CSS, so a long note settles quickly instead of
+  // trickling in for a second.
+  const entrance = { "--i": index } as CSSProperties;
+
   if (isEditing) {
     return (
-      <div className="blk blk-editing">
+      <div className="blk blk-editing" style={entrance}>
         <textarea
           ref={(el) => registerTextarea(block.id, el)}
           className="blk-input"
@@ -203,6 +211,7 @@ const BlockView = memo(function BlockView({
   return (
     <div
       className={`blk blk-${block.kind}`}
+      style={entrance}
       onClick={onClick}
       // Content comes from the user's own notes; raw HTML is escaped on render.
       dangerouslySetInnerHTML={{ __html: html }}
@@ -222,7 +231,13 @@ export default function BlockEditor({
   onTagClick,
 }: Props) {
   const [blocks, setBlocks] = useState<Block[]>(() => splitBlocks(content));
-  const [editingId, setEditingId] = useState<string | null>(null);
+  // Opening a note drops the caret straight into the first block, so typing
+  // works the moment a note appears — no click and no Ctrl+E detour. The note
+  // identity is the `key` below (`key={activeNote.id}` in App), so the lazy
+  // initializer runs again for every note that is opened.
+  const [editingId, setEditingId] = useState<string | null>(
+    () => splitBlocks(content)[0]?.id ?? null,
+  );
 
   // Mirrors of state that the keyboard handlers need synchronously. They are
   // written from an effect and from `flush`, so handlers never read a stale
@@ -460,9 +475,10 @@ export default function BlockEditor({
 
   return (
     <div className="editor-body">
-      {blocks.map((block) => (
+      {blocks.map((block, index) => (
         <BlockView
           key={block.id}
+          index={index}
           block={block}
           isEditing={editingId === block.id}
           context={renderContext}

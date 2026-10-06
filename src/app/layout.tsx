@@ -7,9 +7,11 @@ import {
   Literata,
   Manrope,
   Newsreader,
-  Space_Grotesk,
-} from "next/font/google";
+  Space_Grotesk, Geist } from "next/font/google";
 import "./globals.css";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 /**
  * Every typeface offered in Settings is loaded once, as a variable font, and
@@ -42,7 +44,10 @@ const fontClass = [
 ].join(" ");
 
 export const metadata: Metadata = {
-  title: "Glyph — a quiet markdown editor",
+  title: {
+    default: "Glyph Text Editor",
+    template: "%s — Glyph Text Editor",
+  },
   description:
     "A local-first markdown editor with inline rendering, wikilinks, tags and folders.",
   applicationName: "Glyph",
@@ -59,7 +64,7 @@ export const viewport: Viewport = {
 const bootstrap = `try{
 var p=JSON.parse(localStorage.getItem("glyph.prefs.v1")||"{}");
 var t=p.theme||"system";
-if(t==="system"){t=window.matchMedia("(prefers-color-scheme: light)").matches?"light":"dark"}
+if(t==="aluminium"){t="system"}
 document.documentElement.dataset.theme=t;
 var f=localStorage.getItem("glyph.font");
 if(f&&/^[a-z-]+$/.test(f)){document.documentElement.dataset.font=f}
@@ -67,7 +72,7 @@ if(f&&/^[a-z-]+$/.test(f)){document.documentElement.dataset.font=f}
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" suppressHydrationWarning className={fontClass} data-font="inter">
+    <html lang="en" suppressHydrationWarning className={cn(fontClass, "font-sans", geist.variable)} data-font="inter">
       <body>
         <script dangerouslySetInnerHTML={{ __html: bootstrap }} />
         {children}

@@ -23,15 +23,15 @@ export type Vault = {
 };
 
 /**
- * "system" follows the operating system's light/dark preference; every other
- * value is a fixed palette. Dark grounds carry a light accent, the light
- * palette a dark one, so text stays readable either way.
+ * "system" is Device: a fixed brushed-space-grey palette (the "aluminium" look)
+ * — it no longer follows the operating system. Every other value is a fixed
+ * palette: dark grounds carry a light accent, the light palette a dark one.
  */
 export type Theme =
   | "system"
   | "light"
   | "dark"
-  | "aluminium"
+  | "aluminium" // legacy stored value from before the retheme, treated as Device
   | "blue"
   | "red"
   | "yellow"
@@ -58,10 +58,9 @@ export const FONTS: { id: FontId; name: string; note: string }[] = [
 ];
 
 export const THEMES: { id: Theme; name: string; note: string }[] = [
-  { id: "system", name: "Device", note: "Follow this device's setting" },
-  { id: "light", name: "Light", note: "Pale, with a dark accent" },
-  { id: "dark", name: "Dark", note: "The default dark, light accent" },
-  { id: "aluminium", name: "Aluminium", note: "Space grey, brushed metal" },
+  { id: "system", name: "Device", note: "Brushed space grey, no colour at all" },
+  { id: "light", name: "Light", note: "Pale ground, black accent" },
+  { id: "dark", name: "Dark", note: "Ink ground, white accent" },
   { id: "blue", name: "Blueish", note: "Cold blues on deep navy" },
   { id: "red", name: "Reddish", note: "Warm rose on deep brown" },
   { id: "yellow", name: "Yellowish", note: "Amber on dark olive" },

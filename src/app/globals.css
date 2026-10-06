@@ -1,4 +1,8 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
 
 /* ------------------------------------------------------------------ *
  * Tokens
@@ -13,9 +17,65 @@
   --font-code: var(--font-mono), ui-monospace, "Cascadia Code", Menlo, monospace;
 
   --sidebar-w: 268px;
-  --radius: 10px;
+  --radius: 0.625rem;
   --measure: 42rem;
   --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+
+  /* Device — the out-of-the-box palette: brushed space grey, no colour at all.
+     `html[data-theme="system"]` repeats it (old prefs); every themed block
+     below overrides these tokens. */
+  --bg: #14161a;
+  --bg-sunken: #0f1114;
+  --bg-panel: #1a1d22;
+  --bg-raised: #21252b;
+  --bg-hover: #2a2f36;
+  --line: #2f343c;
+  --line-soft: #23272e;
+  --text: #e6e8ea;
+  --text-dim: #a7acb4;
+  --text-faint: #737a84;
+  --accent: #d4dae4;
+  --accent-ink: #14161a;
+  --accent-soft: rgba(212, 218, 228, 0.14);
+  --link: #bcc4d1;
+  --danger: #ff8f8f;
+  --mark: rgba(212, 218, 228, 0.26);
+  --shadow: 0 18px 44px -24px rgba(0, 0, 0, 0.8);
+
+  /* Shadcn tokens alias the palette above, so its components follow Glyph's
+     themes automatically. `--accent` here is genuinely Glyph's accent; the
+     `@theme inline` --color-accent line at the bottom re-points the neutral
+     hover surface at `--bg-hover` to avoid the name clash. */
+  --background: var(--bg);
+  --foreground: var(--text);
+  --card: var(--bg-panel);
+  --card-foreground: var(--text);
+  --popover: var(--bg-raised);
+  --popover-foreground: var(--text);
+  --primary: var(--accent);
+  --primary-foreground: var(--accent-ink);
+  --secondary: var(--bg-raised);
+  --secondary-foreground: var(--text-dim);
+  --muted: var(--bg-panel);
+  --muted-foreground: var(--text-faint);
+  --accent-foreground: var(--text);
+  --destructive: var(--danger);
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--accent);
+  --chart-1: var(--accent);
+  --chart-2: var(--link);
+  --chart-3: var(--text-dim);
+  --chart-4: var(--danger);
+  --chart-5: var(--mark);
+  --sidebar: var(--bg-sunken);
+  --sidebar-foreground: var(--text-dim);
+  --sidebar-primary: var(--accent);
+  --sidebar-primary-foreground: var(--accent-ink);
+  --sidebar-accent: var(--bg-hover);
+  --sidebar-accent-foreground: var(--text);
+  --sidebar-border: var(--line);
+  --sidebar-ring: var(--accent);
 }
 
 /* Only the chosen family is ever painted, so one file is fetched per visit. */
@@ -54,12 +114,12 @@ html[data-theme="dark"] {
   --text: #e8e6ef;
   --text-dim: #a09daf;
   --text-faint: #6f6c7e;
-  --accent: #9d8dfa;
-  --accent-ink: #17161c;
-  --accent-soft: rgba(157, 141, 250, 0.14);
+  --accent: #f4f4f6;
+  --accent-ink: #141519;
+  --accent-soft: rgba(244, 244, 246, 0.12);
   --link: #8ab4f8;
   --danger: #f0808c;
-  --mark: rgba(157, 141, 250, 0.28);
+  --mark: rgba(244, 244, 246, 0.22);
   --shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.9);
   color: var(--text);
   background: var(--bg);
@@ -77,12 +137,12 @@ html[data-theme="light"] {
   --text: #1e1d24;
   --text-dim: #5f5d6c;
   --text-faint: #93919f;
-  --accent: #5b4ad6;
+  --accent: #16181d;
   --accent-ink: #ffffff;
-  --accent-soft: rgba(91, 74, 214, 0.1);
+  --accent-soft: rgba(22, 24, 29, 0.08);
   --link: #2b5fd9;
   --danger: #c62f43;
-  --mark: rgba(91, 74, 214, 0.18);
+  --mark: rgba(22, 24, 29, 0.16);
   --shadow: 0 18px 40px -26px rgba(30, 25, 60, 0.35);
   color: var(--text);
   background: var(--bg);
@@ -138,8 +198,9 @@ html[data-theme="amoled"] {
   background: var(--bg);
 }
 
-/* Aluminium: brushed space grey, no colour at all */
+/* Aluminium — "Device" now. Brushed space grey, no colour at all. */
 
+html[data-theme="system"],
 html[data-theme="aluminium"] {
   color-scheme: dark;
   --bg: #14161a;
@@ -352,6 +413,29 @@ mark {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  padding: 3px 8px;
+  margin: -3px -8px;
+  border-radius: 7px;
+  cursor: text;
+  transition: background 120ms var(--ease);
+}
+
+.crumb:hover {
+  background: var(--bg-hover);
+}
+
+.crumb-input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 8px;
+  border-radius: 7px;
+  border: 1px solid var(--accent);
+  background: var(--bg-raised);
+  outline: none;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--text);
 }
 
 .topbar-right {
@@ -719,21 +803,19 @@ mark {
   transform: rotate(90deg);
 }
 
-/* The row actions keep their space at all times, so revealing them on hover
-   never nudges the note title sideways. */
+/* The row actions always keep their space; the dots stay visible so each note
+   reads as a row that has more to offer, not a bare text line. */
 .row-actions {
   display: flex;
   align-items: center;
   gap: 2px;
   padding: 0 5px 0 2px;
-  visibility: hidden;
-  opacity: 0;
+  opacity: 0.72;
   transition: opacity 110ms var(--ease);
 }
 
 .tree-row:hover .row-actions,
 .tree-row:focus-within .row-actions {
-  visibility: visible;
   opacity: 1;
 }
 
@@ -941,6 +1023,17 @@ mark {
   margin: 0.6em 0;
   cursor: text;
   transition: background 140ms var(--ease), box-shadow 140ms var(--ease);
+  /* Blocks arrive in a gentle cascade; the delay is capped in CSS so a long
+     note settles in well under half a second. */
+  animation: blk-in 240ms var(--ease) backwards;
+  animation-delay: min(calc(var(--i, 0) * 16ms), 240ms);
+}
+
+@keyframes blk-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
 }
 
 .blk:hover {
@@ -1293,6 +1386,16 @@ mark {
   animation: fade 120ms var(--ease);
 }
 
+/* The backdrop of the shadcn Dialog (Base UI) — kept in our theme rather than
+   the stock black wash. Unlayered, so it wins over the builder's utility. */
+[data-slot="dialog-overlay"] {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: color-mix(in srgb, var(--bg-sunken) 62%, transparent);
+  backdrop-filter: blur(3px);
+}
+
 .dialog {
   width: min(var(--dialog-w, 420px), 100%);
   max-width: 100%;
@@ -1307,7 +1410,12 @@ mark {
   border: 1px solid var(--line);
   border-radius: 14px;
   box-shadow: var(--shadow);
-  animation: rise 160ms var(--ease);
+}
+
+.dialog-heading {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
 }
 
 .dialog-head {
@@ -1400,6 +1508,14 @@ mark {
   align-items: flex-start;
   gap: 11px;
   margin-bottom: 12px;
+}
+
+.settings-head > svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--text-dim);
+  margin-top: 2px;
 }
 
 .settings-icon {
@@ -1534,9 +1650,9 @@ mark {
 .theme-card {
   position: relative;
   display: grid;
-  gap: 8px;
-  padding: 10px;
-  border-radius: 10px;
+  gap: 5px;
+  padding: 7px;
+  border-radius: 8px;
   border: 1px solid var(--line);
   background: var(--bg-panel);
   text-align: left;
@@ -1553,35 +1669,35 @@ mark {
 }
 
 .theme-name {
-  font-size: 12.5px;
+  font-size: 11.5px;
   color: var(--text);
 }
 
 .theme-tick {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 5px;
+  right: 5px;
   color: var(--accent);
 }
 
 .theme-tick svg {
-  width: 13px;
-  height: 13px;
+  width: 11px;
+  height: 11px;
 }
 
 .swatch {
   display: inline-flex;
   gap: 2px;
   padding: 2px;
-  border-radius: 6px;
+  border-radius: 5px;
   border: 1px solid var(--line);
   background: var(--bg-raised);
 }
 
 .swatch i {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
 }
 
 /* tag manager */
@@ -1797,6 +1913,7 @@ mark {
   border: 1px solid var(--line);
   background: var(--bg-panel);
   box-shadow: var(--shadow);
+  animation: rise 240ms var(--ease);
 }
 
 .auth-top {
@@ -2036,6 +2153,167 @@ mark {
 }
 
 /* ------------------------------------------------------------------ *
+ * Settings tabs, account forms, share attribution
+ * ------------------------------------------------------------------ */
+
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  margin: -8px -16px 12px;
+  padding: 8px 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-tabs button {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 6px 10px;
+  border: 0;
+  background: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-dim);
+  font-size: 12.5px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: color 120ms var(--ease), border-color 120ms var(--ease);
+}
+
+.settings-tabs button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.settings-tabs button:hover {
+  color: var(--text);
+}
+
+.settings-tabs button.is-on {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.settings-hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 14px 0;
+}
+
+.settings-msg {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.settings-msg.is-ok {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.settings-msg.is-error {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
+.account-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.account-form > .auth-label {
+  width: 100%;
+}
+
+.provider-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 2px;
+}
+
+.provider-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.provider-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.provider-dot.is-google {
+  background: #4285f4;
+}
+
+.provider-dot.is-github {
+  background: #a3a8b0;
+}
+
+.option-check {
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
+}
+
+.share-author {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: -2px 0 12px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+
+.share-author-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.share-by {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.share-by strong {
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.account-label {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px 6px;
+}
+
+.account-email {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-all;
+}
+
+.account-kind {
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+/* ------------------------------------------------------------------ *
  * Small screens: the sidebar becomes a drawer, dialogs become sheets
  * ------------------------------------------------------------------ */
 
@@ -2064,6 +2342,16 @@ mark {
     animation: slide-in 180ms var(--ease);
   }
 
+  /* The exit keeps the element mounted a beat longer (App holds it during a
+     `drawerExiting` state), so closing slides back instead of vanishing. */
+  .app:has(.sidebar) .sidebar.is-closing {
+    animation: slide-out 150ms var(--ease) forwards;
+  }
+
+  .sidebar-scrim.is-closing {
+    animation: fade-out 150ms var(--ease) forwards;
+  }
+
   .sidebar-scrim {
     display: block;
   }
@@ -2071,6 +2359,19 @@ mark {
   @keyframes slide-in {
     from {
       transform: translateX(-16px);
+      opacity: 0;
+    }
+  }
+
+  @keyframes slide-out {
+    to {
+      transform: translateX(-24px);
+      opacity: 0;
+    }
+  }
+
+  @keyframes fade-out {
+    to {
       opacity: 0;
     }
   }
@@ -2122,13 +2423,16 @@ mark {
   }
 
   .dialog {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
     width: 100%;
-    /* A grid item's automatic minimum is its content's min-content width, which
-       would push the sheet wider than the screen it is supposed to fill. */
     min-width: 0;
     max-height: 92dvh;
     border-radius: 16px 16px 0 0;
     border-bottom: 0;
+    transform: none;
     animation: sheet-up 200ms var(--ease);
   }
 
@@ -2284,4 +2588,93 @@ mark {
 ::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--text) 25%, transparent);
   background-clip: content-box;
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--bg-hover);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
 }

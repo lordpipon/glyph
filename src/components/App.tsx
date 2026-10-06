@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { Menu, Settings } from "lucide-react";
 import AccountMenu from "@/components/AccountMenu";
 import BlockEditor from "@/components/Block";
 import QuickSwitcher from "@/components/QuickSwitcher";
@@ -9,7 +10,7 @@ import SettingsDialog from "@/components/SettingsDialog";
 import ShareDialog from "@/components/ShareDialog";
 import Sidebar from "@/components/Sidebar";
 import TagsDialog from "@/components/TagsDialog";
-import { loadAccount, watchAccount, type Account } from "@/lib/auth";
+import { loadAccount, watchAccount, displayName, type Account } from "@/lib/auth";
 import { addTag, removeTag, renameTag, tagsIn } from "@/lib/markdown";
 import { seedVault } from "@/lib/seed";
 import {
@@ -21,7 +22,6 @@ import {
   saveFont,
   savePrefs,
   saveVault,
-  slugify,
   type Prefs,
 } from "@/lib/storage";
 import type { FontId, Folder, Note, Theme, Vault } from "@/lib/types";
@@ -47,6 +47,7 @@ export default function App() {
   });
   const [font, setFont] = useState<FontId>(() => loadFont());
   const [sourceMode, setSourceMode] = useState(false);
+  const [renamingTitle, setRenamingTitle] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -56,6 +57,8 @@ export default function App() {
   // The mirror paints the account chip on the first frame; `watchAccount` below
   // confirms it against Supabase and follows every later change.
   const [account, setAccount] = useState<Account | null>(() => loadAccount());
+  const [drawerExiting, setDrawerExiting] = useState(false);
+  const drawerTimer = useRef<number | null>(null);
 
   const theme = prefs.theme;
 
@@ -102,15 +105,10 @@ export default function App() {
     };
   }, []);
 
-  // "Device" tracks the operating system while it is selected.
+  // "Device" is a fixed palette now; applying it is just writing the attribute
+  // the bootstrap script already painted on the very first frame.
   useEffect(() => {
-    const media = window.matchMedia?.("(prefers-color-scheme: light)");
-    const apply = () => {
-      document.documentElement.dataset.theme = appliedTheme(theme);
-    };
-    apply();
-    media?.addEventListener("change", apply);
-    return () => media?.removeEventListener("change", apply);
+    document.documentElement.dataset.theme = appliedTheme(theme);
   }, [theme]);
 
   /* ---------------- derived ---------------- */
@@ -237,6 +235,21 @@ export default function App() {
     setTagFilter(null);
   }, []);
 
+  /** Settings → Your data: every note, folder and setting as one JSON file. */
+  const downloadData = useCallback(() => {
+    const payload = {
+      app: "glyph",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      account: account ? { email: account.email, username: account.username } : null,
+      preferences: prefs,
+      font,
+      notes: vault.notes,
+      folders: vault.folders,
+    };
+    downloadText("glyph-backup.json", JSON.stringify(payload, null, 2), "application/json");
+  }, [account, prefs, font, vault.notes, vault.folders]);
+
   const moveNote = useCallback((id: string, folderId: string | null) => {
     setVault((v) => ({
       ...v,
@@ -253,25 +266,57 @@ export default function App() {
     [vault.notes, createNote],
   );
 
-  const downloadNote = useCallback(
-    (id: string) => {
-      const note = vault.notes.find((n) => n.id === id);
-      if (note) downloadText(`${slugify(note.title)}.md`, note.content, "text/markdown");
-    },
-    [vault.notes],
-  );
-
   const toggleTag = useCallback((tag: string | null) => {
     setTagFilter((cur) => (tag === null ? null : cur === tag ? null : tag));
   }, []);
 
-  /** On a phone the sidebar covers the page, so opening a note closes it. */
-  const openNote = useCallback((id: string) => {
-    setActiveId(id);
-    if (window.matchMedia?.("(max-width: 860px)").matches) {
+  /* ---------------- the sidebar drawer ---------------- */
+
+  /**
+   * Closing a drawer has to outlive the sidebar by a beat so the exit can be
+   * drawn — the element only exists while it is in the DOM. On a wide screen the
+   * sidebar is a column with nowhere to slide to, so it just goes.
+   */
+  const closeSidebar = useCallback(() => {
+    if (drawerTimer.current !== null) window.clearTimeout(drawerTimer.current);
+    if (!window.matchMedia?.("(max-width: 860px)").matches) {
+      setDrawerExiting(false);
       setPrefs((p) => ({ ...p, sidebarOpen: false }));
+      return;
     }
+    setDrawerExiting(true);
+    drawerTimer.current = window.setTimeout(() => {
+      drawerTimer.current = null;
+      setDrawerExiting(false);
+      setPrefs((p) => ({ ...p, sidebarOpen: false }));
+    }, 170);
   }, []);
+
+  /** Reopening mid-exit cancels the pending close instead of losing the tap. */
+  const toggleSidebar = useCallback(() => {
+    if (drawerTimer.current !== null) {
+      window.clearTimeout(drawerTimer.current);
+      drawerTimer.current = null;
+    }
+    setDrawerExiting(false);
+    setPrefs((p) => ({ ...p, sidebarOpen: !p.sidebarOpen }));
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (drawerTimer.current !== null) window.clearTimeout(drawerTimer.current);
+    },
+    [],
+  );
+
+  /** On a phone the sidebar covers the page, so opening a note closes it. */
+  const openNote = useCallback(
+    (id: string) => {
+      setActiveId(id);
+      closeSidebar();
+    },
+    [closeSidebar],
+  );
 
   /* ---------------- tag editing ---------------- */
 
@@ -313,20 +358,28 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
-      switch (e.key.toLowerCase()) {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const key = e.key.toLowerCase();
+
+      // Ctrl+N is the browser's "new window" and cannot be stopped from a
+      // page, so the new-note shortcut lives on Ctrl+Alt+N instead.
+      if (key === "n") {
+        if (!e.altKey) return;
+        e.preventDefault();
+        createNote("Untitled");
+        return;
+      }
+
+      if (e.altKey) return;
+      switch (key) {
         case "p":
         case "k":
           e.preventDefault();
           setSwitcherOpen(true);
           break;
-        case "n":
-          e.preventDefault();
-          createNote("Untitled");
-          break;
         case "b":
           e.preventDefault();
-          setPrefs((p) => ({ ...p, sidebarOpen: !p.sidebarOpen }));
+          toggleSidebar();
           break;
         case "e":
           e.preventDefault();
@@ -343,7 +396,7 @@ export default function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [createNote, vault]);
+  }, [createNote, toggleSidebar, vault]);
 
   /* ---------------- render ---------------- */
 
@@ -353,9 +406,9 @@ export default function App() {
         <>
           {/* Only visible under 860px, where the sidebar floats as a drawer. */}
           <button
-            className="sidebar-scrim"
+            className={drawerExiting ? "sidebar-scrim is-closing" : "sidebar-scrim"}
             aria-label="Close sidebar"
-            onClick={() => setPrefs((p) => ({ ...p, sidebarOpen: false }))}
+            onClick={closeSidebar}
           />
           <Sidebar
             notes={vault.notes}
@@ -364,13 +417,13 @@ export default function App() {
             tagFilter={tagFilter}
             tagCounts={tagCounts}
             onOpen={openNote}
+            exiting={drawerExiting}
             onToggleTag={toggleTag}
             onCreateNote={(folderId) => createNote("Untitled", folderId)}
             onCreateFolder={createFolder}
             onRename={renameItem}
             onDelete={deleteItem}
             onMove={moveNote}
-            onDownload={downloadNote}
             onShare={setShareId}
             onManageTags={() => setTagsOpen(true)}
           />
@@ -382,12 +435,27 @@ export default function App() {
           <button
             className="icon-btn"
             title="Toggle sidebar (Ctrl+B)"
-            onClick={() => setPrefs((p) => ({ ...p, sidebarOpen: !p.sidebarOpen }))}
+            onClick={toggleSidebar}
           >
-            <MenuIcon />
+            <Menu />
           </button>
 
-          <h1 className="crumb">{activeNote ? activeNote.title : ""}</h1>
+          {activeNote && renamingTitle ? (
+            <TitleInput
+              key={activeNote.id}
+              initial={activeNote.title}
+              onCommit={(name) => renameItem(activeNote.id, name)}
+              onDone={() => setRenamingTitle(false)}
+            />
+          ) : (
+            <h1
+              className="crumb"
+              title={activeNote ? "Rename this note" : ""}
+              onClick={() => activeNote && setRenamingTitle(true)}
+            >
+              {activeNote ? activeNote.title : ""}
+            </h1>
+          )}
 
           <div className="topbar-right">
             <span className={`saved ${saved ? "is-on" : ""}`}>{saved ? "Saved" : ""}</span>
@@ -412,7 +480,7 @@ export default function App() {
               title="Settings"
               onClick={() => setSettingsOpen(true)}
             >
-              <GearIcon />
+              <Settings />
             </button>
           </div>
         </header>
@@ -436,7 +504,7 @@ export default function App() {
               />
             )
           ) : (
-            <p className="empty">No note open. Press Ctrl+N to start one.</p>
+            <p className="empty">No note open. Press Ctrl+Alt+N to start one.</p>
           )}
         </div>
       </main>
@@ -461,9 +529,11 @@ export default function App() {
           font={font}
           theme={theme}
           noteCount={vault.notes.length}
+          account={account}
           onFont={setFont}
           onTheme={(next: Theme) => setPrefs((p) => ({ ...p, theme: next }))}
           onResetVault={resetVault}
+          onDownloadData={downloadData}
           onClose={() => setSettingsOpen(false)}
         />
       )}
@@ -484,6 +554,7 @@ export default function App() {
         <ShareDialog
           title={sharedNote.title || "Untitled"}
           markdown={sharedNote.content}
+          author={displayName(account)}
           onClose={() => setShareId(null)}
         />
       )}
@@ -521,20 +592,36 @@ function firstHeading(content: string): string | null {
   return m ? m[1].trim() : null;
 }
 
-function MenuIcon() {
+/** Inline rename for the title in the top bar — click it, type, click away. */
+function TitleInput({
+  initial,
+  onCommit,
+  onDone,
+}: {
+  initial: string;
+  onCommit: (value: string) => void;
+  onDone: () => void;
+}) {
+  const [value, setValue] = useState(initial);
   return (
-    <svg viewBox="0 0 16 16" aria-hidden>
-      <path d="M2.5 4h11M2.5 8h11M2.5 12h11" />
-    </svg>
-  );
-}
-
-function GearIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden>
-      <circle cx="8" cy="8" r="2.25" />
-      <path d="M8 1.5v1.75M8 12.75V14.5M14.5 8h-1.75M3.25 8H1.5M12.6 3.4l-1.25 1.25M4.65 11.35L3.4 12.6M12.6 12.6l-1.25-1.25M4.65 4.65L3.4 3.4" />
-    </svg>
+    <input
+      className="crumb-input"
+      value={value}
+      autoFocus
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={() => {
+        onDone();
+        if (value.trim()) onCommit(value.trim());
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") e.currentTarget.blur();
+        if (e.key === "Escape") {
+          setValue(initial);
+          e.currentTarget.blur();
+        }
+      }}
+    />
   );
 }
 

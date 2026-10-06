@@ -52,6 +52,9 @@ export default function SharePage({ params }: { params: Promise<{ slug: string }
       <header className="share-bar">
         <span className="share-badge">Glyph</span>
         <span className="share-name">{note.title || slug}</span>
+        <span className="share-by">
+          Shared by <strong>{note.author || "Anonymous"}</strong>
+        </span>
         <Link className="ghost-btn" href="/">
           Open Glyph
         </Link>

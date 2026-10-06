@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Pen, Trash2, X } from "lucide-react";
 import Dialog from "@/components/Dialog";
 import { noteHasTag } from "@/lib/markdown";
 import type { Note } from "@/lib/types";
@@ -62,9 +63,7 @@ export default function TagsDialog({
                   title={`Remove #${tag} from this note`}
                   onClick={() => onRemoveTagFromNote(activeNote.id, tag)}
                 >
-                  <svg viewBox="0 0 16 16" aria-hidden>
-                    <path d="M4.5 4.5l7 7M11.5 4.5l-7 7" />
-                  </svg>
+                  <X />
                 </button>
               </span>
             ))}
@@ -201,17 +200,9 @@ function TagRow({
 }
 
 function PencilIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden>
-      <path d="M11.5 2.5l2 2L6 12H4v-2z" />
-    </svg>
-  );
+  return <Pen aria-hidden />;
 }
 
 function TrashIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden>
-      <path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8h5.8l.6-8" />
-    </svg>
-  );
+  return <Trash2 aria-hidden />;
 }

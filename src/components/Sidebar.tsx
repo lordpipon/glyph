@@ -1,8 +1,32 @@
 ﻿"use client";
 
 import { useMemo, useState } from "react";
+import {
+  ChevronRight,
+  FilePlus2,
+  FileText,
+  Folder as FolderGlyph,
+  FolderInput,
+  FolderPlus,
+  Inbox,
+  Lock,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Search,
+  Share2,
+  SlidersHorizontal,
+  Trash2,
+  X,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import Dialog, { PromptDialog } from "@/components/Dialog";
-import Menu, { type MenuEntry } from "@/components/Menu";
 import type { Folder, Note } from "@/lib/types";
 
 type Props = {
@@ -18,12 +42,13 @@ type Props = {
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
   onMove: (id: string, folderId: string | null) => void;
-  onDownload: (id: string) => void;
   onShare: (id: string) => void;
   onManageTags: () => void;
+  /** Drawer only: set while it slides away, so closing is animated too. */
+  exiting?: boolean;
 };
 
-type MenuState = { x: number; y: number; kind: "note" | "folder"; id: string } | null;
+type MenuKey = `note:${string}` | `folder:${string}`; /* which row's menu is open */
 
 const INDENT = 14;
 
@@ -40,14 +65,14 @@ export default function Sidebar({
   onRename,
   onDelete,
   onMove,
-  onDownload,
   onShare,
   onManageTags,
+  exiting = false,
 }: Props) {
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [menu, setMenu] = useState<MenuState>(null);
+  const [menuKey, setMenuKey] = useState<MenuKey | null>(null);
   const [moveTarget, setMoveTarget] = useState<string | null>(null);
   const [newFolderIn, setNewFolderIn] = useState<string | null | undefined>(undefined);
 
@@ -103,64 +128,16 @@ export default function Sidebar({
     [tagCounts],
   );
 
-  const openMenu = (
-    e: { clientX: number; clientY: number; preventDefault: () => void },
-    kind: "note" | "folder",
-    id: string,
-  ) => {
-    e.preventDefault();
-    setMenu({ x: e.clientX, y: e.clientY, kind, id });
+  const openMenu = (key: MenuKey) => {
+    setMenuKey(key);
   };
 
-  const menuEntries: MenuEntry[] = useMemo(() => {
-    if (!menu) return [];
-
-    if (menu.kind === "folder") {
-      const folderId = menu.id;
-      const folder = folders.find((f) => f.id === folderId);
-      return [
-        { kind: "item", label: "New note inside", onSelect: () => onCreateNote(folderId) },
-        { kind: "item", label: "New subfolder", onSelect: () => setNewFolderIn(folderId) },
-        { kind: "separator" },
-        { kind: "item", label: "Rename", onSelect: () => setRenamingId(folderId) },
-        {
-          kind: "item",
-          label: `Delete “${folder?.name ?? ""}”`,
-          danger: true,
-          onSelect: () => onDelete(folderId),
-        },
-      ];
-    }
-
-    const noteId = menu.id;
-    const note = notes.find((n) => n.id === noteId);
-    const entries: MenuEntry[] = [
-      { kind: "item", label: "Rename", onSelect: () => setRenamingId(noteId) },
-      { kind: "item", label: "Download", onSelect: () => onDownload(noteId) },
-      { kind: "item", label: "Share", onSelect: () => onShare(noteId) },
-      { kind: "item", label: "Move to…", onSelect: () => setMoveTarget(noteId) },
-    ];
-    // The welcome note has no delete entry — it is the one note that stays.
-    if (note?.locked) {
-      entries.push(
-        { kind: "separator" },
-        { kind: "item", label: "Kept, cannot be deleted", onSelect: () => {}, disabled: true },
-      );
-    } else {
-      entries.push(
-        { kind: "separator" },
-        { kind: "item", label: "Delete", danger: true, onSelect: () => onDelete(noteId) },
-      );
-    }
-    return entries;
-  }, [menu, folders, notes, onCreateNote, onDelete, onDownload, onShare]);
-
   return (
-    <aside className="sidebar">
+    <aside className={exiting ? "sidebar is-closing" : "sidebar"}>
       <div className="sidebar-top">
         <h2 className="brand">Glyph</h2>
         <div className="toolbar">
-          <button className="icon-btn" onClick={() => onCreateNote(null)} title="New note (Ctrl+N)">
+          <button className="icon-btn" onClick={() => onCreateNote(null)} title="New note (Ctrl+Alt+N)">
             <PlusIcon />
           </button>
           <button
@@ -202,94 +179,150 @@ export default function Sidebar({
         {rows.length === 0 && <p className="tree-empty">Nothing here.</p>}
         {rows.map((row) =>
           row.kind === "folder" ? (
-            <div
+            <DropdownMenu
               key={row.folder.id}
-              className="tree-row folder-row"
-              onContextMenu={(e) => openMenu(e, "folder", row.folder.id)}
+              open={menuKey === `folder:${row.folder.id}`}
+              onOpenChange={(open) =>
+                setMenuKey(open ? `folder:${row.folder.id}` : null)
+              }
             >
-              <button
-                className="tree-item folder"
-                style={{ paddingLeft: 6 + row.depth * INDENT }}
-                onClick={() =>
-                  setCollapsed((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(row.folder.id)) next.delete(row.folder.id);
-                    else next.add(row.folder.id);
-                    return next;
-                  })
-                }
-                aria-expanded={!collapsed.has(row.folder.id)}
+              <div
+                className="tree-row folder-row"
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  openMenu(`folder:${row.folder.id}`);
+                }}
               >
-                <ChevronIcon open={!collapsed.has(row.folder.id)} />
-                {renamingId === row.folder.id ? (
-                  <RenameInput
-                    initial={row.folder.name}
-                    onCommit={(v) => onRename(row.folder.id, v)}
-                    onDone={() => setRenamingId(null)}
+                <button
+                  className="tree-item folder"
+                  style={{ paddingLeft: 6 + row.depth * INDENT }}
+                  onClick={() =>
+                    setCollapsed((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(row.folder.id)) next.delete(row.folder.id);
+                      else next.add(row.folder.id);
+                      return next;
+                    })
+                  }
+                  aria-expanded={!collapsed.has(row.folder.id)}
+                >
+                  <ChevronIcon open={!collapsed.has(row.folder.id)} />
+                  {renamingId === row.folder.id ? (
+                    <RenameInput
+                      initial={row.folder.name}
+                      onCommit={(v) => onRename(row.folder.id, v)}
+                      onDone={() => setRenamingId(null)}
+                    />
+                  ) : (
+                    <span className="label">{row.folder.name}</span>
+                  )}
+                </button>
+                <div className="row-actions">
+                  <button
+                    className="icon-btn tiny"
+                    title="New note inside"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCreateNote(row.folder.id);
+                    }}
+                  >
+                    <PlusIcon />
+                  </button>
+                  <DropdownMenuTrigger
+                    render={
+                      <button className="icon-btn tiny" title="Folder menu">
+                        <DotsIcon />
+                      </button>
+                    }
                   />
-                ) : (
-                  <span className="label">{row.folder.name}</span>
-                )}
-              </button>
-              <div className="row-actions">
-                <button
-                  className="icon-btn tiny"
-                  title="New note inside"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onCreateNote(row.folder.id);
-                  }}
-                >
-                  <PlusIcon />
-                </button>
-                <button
-                  className="icon-btn tiny"
-                  title="Menu"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openMenu(e, "folder", row.folder.id);
-                  }}
-                >
-                  <DotsIcon />
-                </button>
+                </div>
               </div>
-            </div>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => onCreateNote(row.folder.id)}>
+                  <FilePlus2 /> New note inside
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setNewFolderIn(row.folder.id)}>
+                  <FolderPlus /> New subfolder
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setRenamingId(row.folder.id)}>
+                  <Pencil /> Rename
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onSelect={() => onDelete(row.folder.id)}
+                >
+                  <Trash2 /> Delete “{row.folder.name}”
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : (
-            <div
+            <DropdownMenu
               key={row.note.id}
-              className={`tree-row note-row ${activeId === row.note.id ? "is-active" : ""}`}
-              onContextMenu={(e) => openMenu(e, "note", row.note.id)}
+              open={menuKey === `note:${row.note.id}`}
+              onOpenChange={(open) =>
+                setMenuKey(open ? `note:${row.note.id}` : null)
+              }
             >
-              <button
-                className="tree-item note"
-                style={{ paddingLeft: 6 + row.depth * INDENT }}
-                onClick={() => onOpen(row.note.id)}
-                title={row.note.title}
+              <div
+                className={`tree-row note-row ${activeId === row.note.id ? "is-active" : ""}`}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  openMenu(`note:${row.note.id}`);
+                }}
               >
-                <FileIcon />
-                {renamingId === row.note.id ? (
-                  <RenameInput
-                    initial={row.note.title}
-                    onCommit={(v) => onRename(row.note.id, v)}
-                    onDone={() => setRenamingId(null)}
-                  />
-                ) : (
-                  <span className="label">{row.note.title || "Untitled"}</span>
-                )}
-              </button>
-              <div className="row-actions">
                 <button
-                  className="icon-btn tiny"
-                  title="Menu"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openMenu(e, "note", row.note.id);
-                  }}
+                  className="tree-item note"
+                  style={{ paddingLeft: 6 + row.depth * INDENT }}
+                  onClick={() => onOpen(row.note.id)}
+                  title={row.note.title}
                 >
-                  <DotsIcon />
+                  <FileIcon />
+                  {renamingId === row.note.id ? (
+                    <RenameInput
+                      initial={row.note.title}
+                      onCommit={(v) => onRename(row.note.id, v)}
+                      onDone={() => setRenamingId(null)}
+                    />
+                  ) : (
+                    <span className="label">{row.note.title || "Untitled"}</span>
+                  )}
                 </button>
+                <div className="row-actions">
+                  <DropdownMenuTrigger
+                    render={
+                      <button className="icon-btn tiny" title="Note menu">
+                        <DotsIcon />
+                      </button>
+                    }
+                  />
+                </div>
               </div>
-            </div>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => setRenamingId(row.note.id)}>
+                  <Pencil /> Rename
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => onShare(row.note.id)}>
+                  <Share2 /> Share
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setMoveTarget(row.note.id)}>
+                  <FolderInput /> Move to…
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {row.note.locked ? (
+                  <DropdownMenuItem disabled>
+                    <Lock /> Kept, cannot be deleted
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onSelect={() => onDelete(row.note.id)}
+                  >
+                    <Trash2 /> Delete
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           ),
         )}
       </nav>
@@ -318,8 +351,6 @@ export default function Sidebar({
           </div>
         )}
       </div>
-
-      {menu && <Menu x={menu.x} y={menu.y} entries={menuEntries} onClose={() => setMenu(null)} />}
 
       {moveTarget && (
         <Dialog title="Move note" onClose={() => setMoveTarget(null)} width={340}>
@@ -404,92 +435,41 @@ function RenameInput({
 }
 
 function PlusIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden>
-      <path d="M8 3.5v9M3.5 8h9" />
-    </svg>
-  );
+  return <Plus aria-hidden />;
 }
 
 function FolderPlusIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden>
-      <path d="M1.75 4.25h4l1.5 1.75h6.99v6a1 1 0 01-1 1H2.75a1 1 0 01-1-1z" />
-      <path d="M8 8v3.5M6.25 9.75h3.5" />
-    </svg>
-  );
+  return <FolderPlus aria-hidden />;
 }
 
 function FolderIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden>
-      <path d="M1.75 4.25h4l1.5 1.75h6.99v6a1 1 0 01-1 1H2.75a1 1 0 01-1-1z" />
-    </svg>
-  );
+  return <FolderGlyph aria-hidden />;
 }
 
 function InboxIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden>
-      <path d="M2 9.5h3l1 2h4l1-2h3M2 9.5l1.8-5.3a1 1 0 011-.7h6.4a1 1 0 011 .7L14 9.5v3a1 1 0 01-1 1H3a1 1 0 01-1-1z" />
-    </svg>
-  );
+  return <Inbox aria-hidden />;
 }
 
 function FileIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden>
-      <path d="M4 2.5h4.5L12 6v7.5H4z" />
-      <path d="M8.5 2.5V6H12" />
-    </svg>
-  );
+  return <FileText aria-hidden />;
 }
 
 function ChevronIcon({ open }: { open: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      aria-hidden
-      className={`chevron ${open ? "is-open" : ""}`}
-    >
-      <path d="M6.5 4l4 4-4 4" />
-    </svg>
-  );
+  return <ChevronRight aria-hidden className={`chevron ${open ? "is-open" : ""}`} />;
 }
 
 function DotsIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden>
-      <circle cx="4" cy="8" r="1.15" />
-      <circle cx="8" cy="8" r="1.15" />
-      <circle cx="12" cy="8" r="1.15" />
-    </svg>
-  );
+  return <MoreHorizontal aria-hidden />;
 }
 
 function SearchIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden className="search-icon">
-      <circle cx="7" cy="7" r="4.25" />
-      <path d="M10.2 10.2L14 14" />
-    </svg>
-  );
+  return <Search aria-hidden className="search-icon" />;
 }
 
 function XIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden>
-      <path d="M4.5 4.5l7 7M11.5 4.5l-7 7" />
-    </svg>
-  );
+  return <X aria-hidden />;
 }
 
 function SlidersIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden>
-      <path d="M2.5 5h11M2.5 11h11" />
-      <circle cx="6" cy="5" r="1.6" />
-      <circle cx="10.5" cy="11" r="1.6" />
-    </svg>
-  );
+  return <SlidersHorizontal aria-hidden />;
 }

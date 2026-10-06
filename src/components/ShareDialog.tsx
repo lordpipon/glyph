@@ -11,14 +11,16 @@ import { copyText, encodeShare } from "@/lib/share";
 export default function ShareDialog({
   title,
   markdown,
+  author,
   onClose,
 }: {
   title: string;
   markdown: string;
+  author?: string | null;
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState<"idle" | "done" | "failed">("idle");
-  const url = encodeShare(markdown, title);
+  const url = encodeShare(markdown, title, author);
   const huge = url.length > 8000;
 
   const copy = async () => {
@@ -33,6 +35,12 @@ export default function ShareDialog({
         Anyone with this link can read the note. It opens as a page, and Glyph is
         not required.
       </p>
+      {author && (
+        <p className="share-author">
+          <span className="share-author-dot" aria-hidden /> Shared by{" "}
+          <strong>{author}</strong>
+        </p>
+      )}
 
       <div className="share-row">
         <input className="field mono" readOnly value={url} onFocus={(e) => e.currentTarget.select()} />
@@ -47,7 +55,7 @@ export default function ShareDialog({
         ) : huge ? (
           <>
             This note is long, so the link is {Math.round(url.length / 1000)}k characters. Some
-            chat apps will cut it off — Download is safer for big notes.
+            chat apps will cut it off.
           </>
         ) : (
           <>The whole note travels inside the link, which keeps it working on any static host.</>

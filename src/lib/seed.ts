@@ -31,7 +31,7 @@ waiting on a decision. Rename, add or drop them with the button next to
 | Keys | Action |
 | --- | --- |
 | \`Ctrl + P\` | Quick switcher |
-| \`Ctrl + N\` | New note |
+| \`Ctrl + Alt + N\` | New note |
 | \`Ctrl + B\` | Toggle sidebar |
 | \`Ctrl + E\` | Read the raw markdown |
 | \`Ctrl + S\` | Save now |

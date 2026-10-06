@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import AuthPanel from "@/components/AuthPanel";
 
 export const metadata: Metadata = {
-  title: "Sign in — Glyph",
+  title: "Sign in",
   description: "Open the notes you left in the cloud.",
 };
 

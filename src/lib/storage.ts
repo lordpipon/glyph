@@ -72,10 +72,9 @@ export function saveFont(font: FontId): void {
   }
 }
 
-/** "system" collapses to whichever palette the device is asking for. */
-export function appliedTheme(theme: Theme): Exclude<Theme, "system"> {
-  if (theme !== "system") return theme;
-  return prefersLight() ? "light" : "dark";
+/** "system" is Device, a fixed palette; legacy "aluminium" is the same look. */
+export function appliedTheme(theme: Theme): Theme {
+  return theme === "aluminium" ? "system" : theme;
 }
 
 export function prefersLight(): boolean {

@@ -18,22 +18,35 @@ function fromBase64Url(value: string): Uint8Array {
   return Uint8Array.from(binary, (ch) => ch.charCodeAt(0));
 }
 
-export function encodeShare(markdown: string, title: string): string {
-  const payload = toBase64Url(new TextEncoder().encode(JSON.stringify({ t: title, m: markdown })));
+export function encodeShare(markdown: string, title: string, author?: string | null): string {
+  const payload = toBase64Url(
+    new TextEncoder().encode(
+      JSON.stringify({ t: title, m: markdown, a: author?.trim() || undefined }),
+    ),
+  );
   return `${location.origin}/share/${slug(title)}.md#${payload}`;
 }
 
 /** `null` when the fragment is missing or was tampered with. */
-export function decodeShare(hash: string): { title: string; markdown: string } | null {
+export function decodeShare(hash: string): {
+  title: string;
+  markdown: string;
+  author?: string;
+} | null {
   const raw = hash.replace(/^#/, "");
   if (!raw) return null;
   try {
     const parsed = JSON.parse(new TextDecoder().decode(fromBase64Url(raw))) as {
       t?: string;
       m?: string;
+      a?: string;
     };
     if (typeof parsed.m !== "string") return null;
-    return { title: typeof parsed.t === "string" ? parsed.t : "Shared note", markdown: parsed.m };
+    return {
+      title: typeof parsed.t === "string" ? parsed.t : "Shared note",
+      markdown: parsed.m,
+      author: typeof parsed.a === "string" && parsed.a ? parsed.a : undefined,
+    };
   } catch {
     return null;
   }

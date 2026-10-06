@@ -1,9 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { X } from "lucide-react";
+import {
+  Dialog as DialogRoot,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
-/** Modal shell: centred, focus-trapped enough for a personal tool, Esc to close. */
+/**
+ * Modal shell built on the shadcn/ui Dialog (Base UI underneath): centred,
+ * Esc and backdrop to close, focus kept inside, entrance and exit animated —
+ * the caller unmounts only after the closing animation has played. The
+ * stylesheet owns the sizing via the `--dialog-w` variable so every dialog
+ * becomes a full-width sheet on small screens.
+ */
 export default function Dialog({
   title,
   onClose,
@@ -15,46 +26,34 @@ export default function Dialog({
   children: ReactNode;
   width?: number;
 }) {
-  const panel = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(true);
+  const closing = useRef(false);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    const first = panel.current?.querySelector<HTMLElement>("input, button, [tabindex]");
-    first?.focus();
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  const requestClose = () => {
+    if (closing.current) return;
+    closing.current = true;
+    setOpen(false);
+    // Base UI plays the closing animation on the popup; hand control back to
+    // the caller once it has finished so the unmount is never a snap.
+    window.setTimeout(onClose, 180);
+  };
 
-  return createPortal(
-    <div className="scrim" onMouseDown={onClose}>
-      <div
+  return (
+    <DialogRoot open={open} onOpenChange={(next) => !next && requestClose()}>
+      <DialogContent
         className="dialog"
-        // A variable rather than `width` itself, so the stylesheet still owns the
-        // size: the small-screen rules turn every dialog into a full-width sheet.
+        showCloseButton={false}
         style={{ "--dialog-w": `${width}px` } as CSSProperties}
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        ref={panel}
-        onMouseDown={(e) => e.stopPropagation()}
       >
         <header className="dialog-head">
-          <h2>{title}</h2>
-          <button className="icon-btn" onClick={onClose} title="Close">
-            <svg viewBox="0 0 16 16" aria-hidden>
-              <path d="M4 4l8 8M12 4l-8 8" />
-            </svg>
+          <DialogTitle className="dialog-heading">{title}</DialogTitle>
+          <button className="icon-btn" onClick={requestClose} title="Close">
+            <X />
           </button>
         </header>
         <div className="dialog-body">{children}</div>
-      </div>
-    </div>,
-    document.body,
+      </DialogContent>
+    </DialogRoot>
   );
 }
 

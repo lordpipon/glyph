@@ -3,14 +3,17 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import {
   ACCOUNT_PITCH,
   loadAccount,
+  signInWithEmailOrUsername,
   signInWithOAuth,
-  signInWithPassword,
   signUpWithPassword,
   type AuthResult,
 } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 /**
  * Sign in and create account, which are the same form with a different ending.
@@ -19,7 +22,9 @@ import {
 export default function AuthPanel({ mode }: { mode: "signin" | "register" }) {
   const register = mode === "register";
   const router = useRouter();
+  const [identifier, setIdentifier] = useState("");
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
@@ -51,7 +56,7 @@ export default function AuthPanel({ mode }: { mode: "signin" | "register" }) {
       <div className="auth-card">
         <div className="auth-top">
           <Link className="back-link" href="/">
-            <BackIcon /> Glyph
+            <ArrowLeft /> Glyph
           </Link>
         </div>
 
@@ -65,22 +70,24 @@ export default function AuthPanel({ mode }: { mode: "signin" | "register" }) {
         </p>
 
         <div className="oauth-row">
-          <button
+          <Button
             type="button"
+            variant="outline"
             className="oauth-btn"
             disabled={busy}
             onClick={() => run(signInWithOAuth("google"))}
           >
             <GoogleIcon /> Google
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="outline"
             className="oauth-btn"
             disabled={busy}
             onClick={() => run(signInWithOAuth("github"))}
           >
             <GitHubIcon /> GitHub
-          </button>
+          </Button>
         </div>
 
         <div className="auth-or" aria-hidden>
@@ -93,28 +100,54 @@ export default function AuthPanel({ mode }: { mode: "signin" | "register" }) {
             e.preventDefault();
             void run(
               register
-                ? signUpWithPassword(email, password, confirm)
-                : signInWithPassword(email, password),
+                ? signUpWithPassword(username, email, password, confirm)
+                : signInWithEmailOrUsername(identifier, password),
             );
           }}
         >
-          <label className="auth-label">
-            <span>Email</span>
-            <input
-              className="field"
-              type="email"
-              value={email}
-              autoComplete="email"
-              placeholder="you@example.com"
-              spellCheck={false}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </label>
+          {register ? (
+            <>
+              <label className="auth-label">
+                <span>Username</span>
+                <Input
+                  value={username}
+                  autoCapitalize="none"
+                  autoComplete="username"
+                  placeholder="how people know you"
+                  spellCheck={false}
+                  onChange={(e) => setUsername(e.target.value)}
+                />
+              </label>
+
+              <label className="auth-label">
+                <span>Email</span>
+                <Input
+                  type="email"
+                  value={email}
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  spellCheck={false}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </label>
+            </>
+          ) : (
+            <label className="auth-label">
+              <span>Email or username</span>
+              <Input
+                value={identifier}
+                autoCapitalize="none"
+                autoComplete="username"
+                placeholder="you@example.com or your-username"
+                spellCheck={false}
+                onChange={(e) => setIdentifier(e.target.value)}
+              />
+            </label>
+          )}
 
           <label className="auth-label">
             <span>Password</span>
-            <input
-              className="field"
+            <Input
               type="password"
               value={password}
               autoComplete={register ? "new-password" : "current-password"}
@@ -126,8 +159,7 @@ export default function AuthPanel({ mode }: { mode: "signin" | "register" }) {
           {register && (
             <label className="auth-label">
               <span>Confirm password</span>
-              <input
-                className="field"
+              <Input
                 type="password"
                 value={confirm}
                 autoComplete="new-password"
@@ -140,9 +172,9 @@ export default function AuthPanel({ mode }: { mode: "signin" | "register" }) {
           {error && <p className="auth-error">{error}</p>}
           {notice && <p className="auth-notice">{notice}</p>}
 
-          <button className="primary-btn auth-submit" type="submit" disabled={busy}>
+          <Button className="auth-submit" type="submit" disabled={busy}>
             {busy ? "Working…" : register ? "Create account" : "Sign in"}
-          </button>
+          </Button>
         </form>
 
         <p className="auth-alt">
@@ -160,14 +192,6 @@ export default function AuthPanel({ mode }: { mode: "signin" | "register" }) {
         <p className="auth-note">{ACCOUNT_PITCH}</p>
       </div>
     </main>
-  );
-}
-
-function BackIcon() {
-  return (
-    <svg viewBox="0 0 16 16" aria-hidden>
-      <path d="M9.5 3.5L5 8l4.5 4.5" />
-    </svg>
   );
 }
 
@@ -197,7 +221,10 @@ function GoogleIcon() {
 function GitHubIcon() {
   return (
     <svg viewBox="0 0 16 16" aria-hidden>
-      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z" />
+      <path
+        d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"
+        fill="currentColor"
+      />
     </svg>
   );
 }
