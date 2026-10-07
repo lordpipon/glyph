@@ -29,7 +29,7 @@ export default function ConfirmDialog({
     <Dialog title={title} onClose={onClose} width={360}>
       <p className="dialog-copy">{note}</p>
       <footer className="dialog-actions">
-        <Button variant="ghost" onClick={onClose}>
+        <Button variant="secondary" onClick={onClose}>
           {cancelLabel}
         </Button>
         <Button variant={danger ? "destructive" : "default"} onClick={onConfirm}>

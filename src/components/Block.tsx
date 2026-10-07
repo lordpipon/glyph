@@ -235,10 +235,12 @@ export default function BlockEditor({
 }: Props) {
   const [blocks, setBlocks] = useState<Block[]>(() => splitBlocks(content));
   // Opening a note drops the caret straight into the first block, so typing
-  // works the moment a note appears — no click and no Ctrl+E detour. The note
-  // identity is the `key` below (`key={activeNote.id}` in App), so the lazy
-  // initializer runs again for every note that is opened. Read-only notes stay
-  // rendered and never take the caret.
+  // works the moment a note appears — no click and no Ctrl+E detour. A brand
+  // new auto-titled note also arrives with the word "Untitled" in the body, and
+  // the focus effect below selects it, so the very first keystroke replaces it.
+  // The note identity is the `key` below (`key={activeNote.id}` in App), so the
+  // lazy initializer runs again for every note that is opened. Read-only notes
+  // stay rendered and never take the caret.
   const [editingId, setEditingId] = useState<string | null>(
     () => (readOnly ? null : splitBlocks(content)[0]?.id ?? null),
   );
@@ -297,8 +299,14 @@ export default function BlockEditor({
     const offset = req && req.id === editingId ? req.offset : el.value.length;
     focusRequest.current = null;
     el.focus();
-    const pos = Math.max(0, Math.min(offset, el.value.length));
-    el.setSelectionRange(pos, pos);
+    // A brand-new note opens with "Untitled" selected, so the first keystroke
+    // replaces the starter text instead of appending after it.
+    if (el.value === "Untitled") {
+      el.setSelectionRange(0, el.value.length);
+    } else {
+      const pos = Math.max(0, Math.min(offset, el.value.length));
+      el.setSelectionRange(pos, pos);
+    }
   });
 
   // Textareas grow with their content, the way a document editor should.

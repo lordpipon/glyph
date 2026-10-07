@@ -69,7 +69,7 @@ export default function SettingsDialog({
           cloud copy yet, so this cannot be undone.
         </p>
         <footer className="dialog-actions">
-          <Button variant="ghost" onClick={() => setConfirming(null)}>
+          <Button variant="secondary" onClick={() => setConfirming(null)}>
             Keep my notes
           </Button>
           <Button
@@ -114,7 +114,7 @@ export default function SettingsDialog({
           <AppearanceSection font={font} theme={theme} onFont={onFont} onTheme={onTheme} />
           <footer className="dialog-actions">
             <Button
-              variant="ghost"
+              variant="secondary"
               disabled={isDefault(font, theme)}
               onClick={() => {
                 onFont("inter");
@@ -123,7 +123,7 @@ export default function SettingsDialog({
             >
               Reset appearance
             </Button>
-            <Button variant="ghost" className="text-destructive" onClick={() => setConfirming("reset")}>
+            <Button variant="destructive" onClick={() => setConfirming("reset")}>
               Reset notes
             </Button>
             <Button onClick={onClose}>Done</Button>
@@ -144,7 +144,7 @@ export default function SettingsDialog({
           <DataSection onDownloadData={onDownloadData} />
           <footer className="dialog-actions">
             <Button
-              variant="ghost"
+              variant="secondary"
               disabled={isDefault(font, theme)}
               onClick={() => {
                 onFont("inter");
@@ -153,7 +153,7 @@ export default function SettingsDialog({
             >
               Reset appearance
             </Button>
-            <Button variant="ghost" className="text-destructive" onClick={() => setConfirming("reset")}>
+            <Button variant="destructive" onClick={() => setConfirming("reset")}>
               Reset notes
             </Button>
             <Button onClick={onClose}>Done</Button>
@@ -442,7 +442,7 @@ function AccountSection({
 
       <footer className="dialog-actions">
         <Button
-          variant="ghost"
+          variant="secondary"
           onClick={async () => {
             setBusy(true);
             await signOut();
@@ -480,7 +480,7 @@ function DeleteDialog({
       </p>
       {message && <p className={`settings-msg is-${message.kind}`}>{message.text}</p>}
       <footer className="dialog-actions">
-        <Button variant="ghost" onClick={onBack} disabled={busy}>
+        <Button variant="secondary" onClick={onBack} disabled={busy}>
           Keep my account
         </Button>
         <Button

@@ -182,7 +182,10 @@ export default function App() {
       id: uid(),
       title,
       autoTitle: title.startsWith("Untitled"),
-      content: "",
+      // A fresh note opens with the word "Untitled" already in the body, so
+      // there is visibly something to edit the moment it appears — nobody has
+      // to guess that a click or Ctrl+E is needed before typing works.
+      content: title.startsWith("Untitled") ? "Untitled" : "",
       folderId,
       createdAt: Date.now(),
       updatedAt: Date.now(),
